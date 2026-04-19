@@ -1,4 +1,7 @@
 #include "LightD3D12/LightD3D12.hpp"
+#include "LightD3D12/LightD3D12Imgui.hpp"
+
+#include <imgui.h>
 
 #include <memory>
 #include <stdexcept>
@@ -10,6 +13,7 @@ namespace
 	struct AppState
 	{
 		std::unique_ptr<DeviceManager> deviceManager;
+		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		RenderPipelineState trianglePipeline;
 		bool running = true;
 		bool minimized = false;
@@ -18,6 +22,11 @@ namespace
 	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
 	{
 		auto* app = reinterpret_cast< AppState* >( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
+
+		if( app != nullptr && app->imguiRenderer && app->imguiRenderer->ProcessMessage( hwnd, message, wParam, lParam ) )
+		{
+			return 1;
+		}
 
 		switch( message )
 		{
@@ -128,7 +137,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		HWND hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
-			L"LightD3D12 Hello Triangle",
+			L"LightD3D12 Hello Triangle + ImGui",
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -161,6 +170,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.vsync = true;
 
 		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 		app.trianglePipeline = CreateTrianglePipeline( *app.deviceManager->GetRenderDevice() );
 
 		MSG message{};
@@ -194,11 +204,33 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = currentTexture;
 
+			if( app.imguiRenderer )
+			{
+				app.imguiRenderer->NewFrame();
+				const float frameRate = ImGui::GetIO().Framerate;
+				const float frameTimeMs = frameRate > 0.0f ? 1000.0f / frameRate : 0.0f;
+
+				ImGui::SetNextWindowPos( ImVec2( 16.0f, 16.0f ), ImGuiCond_Once );
+				ImGui::SetNextWindowSize( ImVec2( 360.0f, 0.0f ), ImGuiCond_Once );
+				ImGui::Begin( "LightD3D12" );
+				ImGui::Text( "Hello from Dear ImGui" );
+				ImGui::Separator();
+				ImGui::Text( "Bindless: %s", ctx->BindlessSupported() ? "enabled" : "disabled" );
+				ImGui::Text( "Swapchain: %u x %u", app.deviceManager->GetWidth(), app.deviceManager->GetHeight() );
+				ImGui::Text( "Frame time: %.3f ms", frameTimeMs );
+				ImGui::Text( "FPS: %.1f", frameRate );
+				ImGui::End();
+			}
+
 			buffer.CmdBeginRendering( renderPass, framebuffer );
 			buffer.CmdBindRenderPipeline( app.trianglePipeline );
 			buffer.CmdPushDebugGroupLabel( "Render Triangle", 0xff0000ff );
 			buffer.CmdDraw( 3 );
 			buffer.CmdPopDebugGroupLabel();
+			if( app.imguiRenderer )
+			{
+				app.imguiRenderer->Render( buffer );
+			}
 			buffer.CmdEndRendering();
 			ctx->Submit( buffer, currentTexture );
 		}
@@ -209,6 +241,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			app.deviceManager->WaitIdle();
 		}
 		app.trianglePipeline = {};
+		app.imguiRenderer.reset();
 		app.deviceManager.reset();
 		if( IsWindow( hwnd ) != FALSE )
 		{

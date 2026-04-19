@@ -6,6 +6,101 @@
 
 namespace lightd3d12
 {
+	namespace
+	{
+		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateBeginningAccess( LoadOp loadOp, const std::array<float, 4>& clearColor )
+		{
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beginningAccess{};
+
+			switch( loadOp )
+			{
+				case LoadOp::Load:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
+					break;
+
+				case LoadOp::Clear:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+					std::memcpy( beginningAccess.Clear.ClearValue.Color, clearColor.data(), sizeof( float ) * clearColor.size() );
+					break;
+
+				case LoadOp::DontCare:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
+					break;
+			}
+
+			return beginningAccess;
+		}
+
+		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateDepthBeginningAccess( LoadOp loadOp, DXGI_FORMAT format, float clearDepth )
+		{
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beginningAccess{};
+
+			switch( loadOp )
+			{
+				case LoadOp::Load:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
+					break;
+
+				case LoadOp::Clear:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+					beginningAccess.Clear.ClearValue.DepthStencil.Depth = clearDepth;
+					beginningAccess.Clear.ClearValue.Format = format;
+					break;
+
+				case LoadOp::DontCare:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
+					break;
+			}
+
+			return beginningAccess;
+		}
+
+		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateStencilBeginningAccess( LoadOp loadOp, DXGI_FORMAT format, uint8_t clearStencil )
+		{
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beginningAccess{};
+
+			switch( loadOp )
+			{
+				case LoadOp::Load:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
+					break;
+
+				case LoadOp::Clear:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+					beginningAccess.Clear.ClearValue.DepthStencil.Stencil = clearStencil;
+					beginningAccess.Clear.ClearValue.Format = format;
+					break;
+
+				case LoadOp::DontCare:
+					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
+					break;
+			}
+
+			return beginningAccess;
+		}
+
+		D3D12_RENDER_PASS_ENDING_ACCESS CreateEndingAccess( StoreOp storeOp )
+		{
+			D3D12_RENDER_PASS_ENDING_ACCESS endingAccess{};
+			endingAccess.Type = storeOp == StoreOp::Store ? D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_PRESERVE : D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_DISCARD;
+			return endingAccess;
+		}
+
+		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateNoAccessBeginningAccess()
+		{
+			D3D12_RENDER_PASS_BEGINNING_ACCESS beginningAccess{};
+			beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_NO_ACCESS;
+			return beginningAccess;
+		}
+
+		D3D12_RENDER_PASS_ENDING_ACCESS CreateNoAccessEndingAccess()
+		{
+			D3D12_RENDER_PASS_ENDING_ACCESS endingAccess{};
+			endingAccess.Type = D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_NO_ACCESS;
+			return endingAccess;
+		}
+	}
+
 	CommandBufferImpl::CommandBufferImpl( DeviceManager::Impl& manager, ImmediateCommands::CommandListWrapper& wrapper ):
 		manager_( manager ),
 		wrapper_( wrapper )
@@ -14,37 +109,114 @@ namespace lightd3d12
 
 	void CommandBufferImpl::CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer )
 	{
-		auto& texture = manager_.GetTextureResource( framebuffer.color[ 0 ].texture );
-		if( texture.currentState_ != D3D12_RESOURCE_STATE_RENDER_TARGET )
+		if( isRendering_ )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				texture.resource_.Get(),
-				texture.currentState_,
-				D3D12_RESOURCE_STATE_RENDER_TARGET );
-			wrapper_.commandList_->ResourceBarrier( 1, &barrier );
-			texture.currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			throw std::runtime_error( "Nested render passes are not supported." );
 		}
 
-		wrapper_.commandList_->OMSetRenderTargets( 1, &texture.rtvHandle_, FALSE, nullptr );
-		if( renderPass.color[ 0 ].loadOp == LoadOp::Clear )
+		std::array<D3D12_RENDER_PASS_RENDER_TARGET_DESC, 1> renderTargetDescs{};
+		uint32_t numRenderTargets = 0;
+
+		TextureResource* viewportTexture = nullptr;
+
+		if( framebuffer.color[ 0 ].texture.Valid() )
 		{
-			wrapper_.commandList_->ClearRenderTargetView( texture.rtvHandle_, renderPass.color[ 0 ].clearColor.data(), 0, nullptr );
+			auto& colorTexture = manager_.GetTextureResource( framebuffer.color[ 0 ].texture );
+			if( colorTexture.rtvHandle_.ptr == 0 )
+			{
+				throw std::runtime_error( "Color attachment does not have an RTV." );
+			}
+
+			if( colorTexture.currentState_ != D3D12_RESOURCE_STATE_RENDER_TARGET )
+			{
+				const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+					colorTexture.resource_.Get(),
+					colorTexture.currentState_,
+					D3D12_RESOURCE_STATE_RENDER_TARGET );
+				wrapper_.commandList_->ResourceBarrier( 1, &barrier );
+				colorTexture.currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			}
+
+			renderTargetDescs[ 0 ].cpuDescriptor = colorTexture.rtvHandle_;
+			renderTargetDescs[ 0 ].BeginningAccess = CreateBeginningAccess( renderPass.color[ 0 ].loadOp, renderPass.color[ 0 ].clearColor );
+			renderTargetDescs[ 0 ].EndingAccess = CreateEndingAccess( renderPass.color[ 0 ].storeOp );
+			numRenderTargets = 1;
+			viewportTexture = &colorTexture;
 		}
+
+		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilDesc{};
+		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC* depthStencilDescPtr = nullptr;
+
+		if( framebuffer.depthStencil.texture.Valid() )
+		{
+			auto& depthTexture = manager_.GetTextureResource( framebuffer.depthStencil.texture );
+			if( depthTexture.dsvHandle_.ptr == 0 )
+			{
+				throw std::runtime_error( "Depth attachment does not have a DSV." );
+			}
+
+			if( depthTexture.currentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE )
+			{
+				const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+					depthTexture.resource_.Get(),
+					depthTexture.currentState_,
+					D3D12_RESOURCE_STATE_DEPTH_WRITE );
+				wrapper_.commandList_->ResourceBarrier( 1, &barrier );
+				depthTexture.currentState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+			}
+
+			depthStencilDesc.cpuDescriptor = depthTexture.dsvHandle_;
+			depthStencilDesc.DepthBeginningAccess = depthTexture.isDepthFormat_
+				? CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp, depthTexture.format_, renderPass.depthStencil.clearDepth )
+				: CreateNoAccessBeginningAccess();
+			depthStencilDesc.DepthEndingAccess = depthTexture.isDepthFormat_
+				? CreateEndingAccess( renderPass.depthStencil.depthStoreOp )
+				: CreateNoAccessEndingAccess();
+			depthStencilDesc.StencilBeginningAccess = depthTexture.isStencilFormat_
+				? CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp, depthTexture.format_, renderPass.depthStencil.clearStencil )
+				: CreateNoAccessBeginningAccess();
+			depthStencilDesc.StencilEndingAccess = depthTexture.isStencilFormat_
+				? CreateEndingAccess( renderPass.depthStencil.stencilStoreOp )
+				: CreateNoAccessEndingAccess();
+			depthStencilDescPtr = &depthStencilDesc;
+
+			if( viewportTexture == nullptr )
+			{
+				viewportTexture = &depthTexture;
+			}
+		}
+
+		if( viewportTexture == nullptr )
+		{
+			throw std::runtime_error( "Framebuffer does not contain any attachments." );
+		}
+
+		wrapper_.commandList_->BeginRenderPass(
+			numRenderTargets,
+			numRenderTargets > 0 ? renderTargetDescs.data() : nullptr,
+			depthStencilDescPtr,
+			D3D12_RENDER_PASS_FLAG_NONE );
 
 		D3D12_VIEWPORT viewport{};
-		viewport.Width = static_cast<float>( texture.width_ );
-		viewport.Height = static_cast<float>( texture.height_ );
+		viewport.Width = static_cast<float>( viewportTexture->width_ );
+		viewport.Height = static_cast<float>( viewportTexture->height_ );
 		viewport.MinDepth = 0.0f;
 		viewport.MaxDepth = 1.0f;
 		wrapper_.commandList_->RSSetViewports( 1, &viewport );
 
-		D3D12_RECT scissor{ 0, 0, static_cast<LONG>( texture.width_ ), static_cast<LONG>( texture.height_ ) };
+		D3D12_RECT scissor{ 0, 0, static_cast<LONG>( viewportTexture->width_ ), static_cast<LONG>( viewportTexture->height_ ) };
 		wrapper_.commandList_->RSSetScissorRects( 1, &scissor );
 		isRendering_ = true;
 	}
 
 	void CommandBufferImpl::CmdEndRendering()
 	{
+		if( !isRendering_ )
+		{
+			return;
+		}
+
+		wrapper_.commandList_->EndRenderPass();
 		isRendering_ = false;
 	}
 

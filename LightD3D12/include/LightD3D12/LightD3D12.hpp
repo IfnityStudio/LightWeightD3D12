@@ -78,18 +78,37 @@ namespace lightd3d12
 	enum class LoadOp : uint8_t
 	{
 		Load,
-		Clear
+		Clear,
+		DontCare
+	};
+
+	enum class StoreOp : uint8_t
+	{
+		Store,
+		DontCare
 	};
 
 	struct ColorAttachmentDesc
 	{
 		LoadOp loadOp = LoadOp::Load;
+		StoreOp storeOp = StoreOp::Store;
 		std::array<float, 4> clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+	};
+
+	struct DepthStencilAttachmentDesc
+	{
+		LoadOp depthLoadOp = LoadOp::Load;
+		StoreOp depthStoreOp = StoreOp::Store;
+		LoadOp stencilLoadOp = LoadOp::Load;
+		StoreOp stencilStoreOp = StoreOp::Store;
+		float clearDepth = 1.0f;
+		uint8_t clearStencil = 0;
 	};
 
 	struct RenderPass
 	{
 		std::array<ColorAttachmentDesc, 1> color = {};
+		DepthStencilAttachmentDesc depthStencil = {};
 	};
 
 	struct ColorAttachment
@@ -97,9 +116,15 @@ namespace lightd3d12
 		TextureHandle texture = {};
 	};
 
+	struct DepthStencilAttachment
+	{
+		TextureHandle texture = {};
+	};
+
 	struct Framebuffer
 	{
 		std::array<ColorAttachment, 1> color = {};
+		DepthStencilAttachment depthStencil = {};
 	};
 
 	struct ShaderStageSource
@@ -219,6 +244,7 @@ namespace lightd3d12
 	};
 
 	class DeviceManager;
+	class ImguiRenderer;
 
 	class RenderDevice
 	{
@@ -269,6 +295,7 @@ namespace lightd3d12
 
 	private:
 		friend class RenderDevice;
+		friend class ImguiRenderer;
 		std::unique_ptr<Impl> impl_;
 		RenderDevice renderDevice_;
 	};

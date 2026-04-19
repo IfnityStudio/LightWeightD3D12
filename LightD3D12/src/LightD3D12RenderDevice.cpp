@@ -67,14 +67,14 @@ namespace lightd3d12
 
 	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer, TextureHandle presentTexture )
 	{
-		auto& impl = *manager_->impl_;
-		auto* commandBuffer = dynamic_cast<CommandBufferImpl*>( &buffer );
+		DeviceManager::Impl& impl = *manager_->impl_;
+		CommandBufferImpl* commandBuffer = dynamic_cast<CommandBufferImpl*>( &buffer );
 		if( commandBuffer == nullptr || commandBuffer != impl.currentCommandBuffer_.get() )
 		{
 			throw std::runtime_error( "The command buffer does not belong to this render device." );
 		}
 
-		auto& texture = impl.GetTextureResource( presentTexture );
+		TextureResource& texture = impl.GetTextureResource( presentTexture );
 		if( texture.currentState_ != D3D12_RESOURCE_STATE_PRESENT )
 		{
 			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
