@@ -3,11 +3,192 @@
 #include "LightD3D12StagingDevice.hpp"
 #include "LightD3D12Swapchain.hpp"
 
+#include <dxcapi.h>
 #include <d3dcompiler.h>
+#include <array>
 #include <cstring>
+#include <filesystem>
+#include <string_view>
 
 namespace lightd3d12
 {
+	namespace
+	{
+		struct CompiledShader final
+		{
+			ComPtr<ID3DBlob> d3dBlob_;
+			ComPtr<IDxcBlob> dxcBlob_;
+
+			D3D12_SHADER_BYTECODE Bytecode() const noexcept
+			{
+				if( dxcBlob_ != nullptr )
+				{
+					return { dxcBlob_->GetBufferPointer(), dxcBlob_->GetBufferSize() };
+				}
+
+				return { d3dBlob_->GetBufferPointer(), d3dBlob_->GetBufferSize() };
+			}
+		};
+
+		bool IsShaderModel6Profile( const char* profile ) noexcept
+		{
+			return profile != nullptr && std::strstr( profile, "_6_" ) != nullptr;
+		}
+
+		std::wstring ToWide( const char* text )
+		{
+			if( text == nullptr )
+			{
+				return {};
+			}
+
+			const int size = MultiByteToWideChar( CP_UTF8, 0, text, -1, nullptr, 0 );
+			if( size <= 0 )
+			{
+				return {};
+			}
+
+			std::wstring wide( static_cast<size_t>( size ), L'\0' );
+			MultiByteToWideChar( CP_UTF8, 0, text, -1, wide.data(), size );
+			if( !wide.empty() )
+			{
+				wide.pop_back();
+			}
+			return wide;
+		}
+
+		DxcCreateInstanceProc LoadDxcCreateInstance()
+		{
+			static DxcCreateInstanceProc ourCreateInstance = []() -> DxcCreateInstanceProc
+				{
+					const std::array<std::filesystem::path, 4> ourCandidates = {
+						std::filesystem::path( LR"(C:\Program Files\Microsoft PIX\2601.15\dxcompiler.dll)" ),
+						std::filesystem::path( LR"(C:\Program Files\RenderDoc\plugins\d3d12\dxcompiler.dll)" ),
+						std::filesystem::path( LR"(C:\Program Files\BraveSoftware\Brave-Browser\Application\147.1.89.137\dxcompiler.dll)" ),
+						std::filesystem::current_path() / "dxcompiler.dll",
+					};
+
+					for( const auto& candidate : ourCandidates )
+					{
+						if( !std::filesystem::exists( candidate ) )
+						{
+							continue;
+						}
+
+						HMODULE module = LoadLibraryW( candidate.c_str() );
+						if( module == nullptr )
+						{
+							continue;
+						}
+
+						auto* createInstance = reinterpret_cast<DxcCreateInstanceProc>( GetProcAddress( module, "DxcCreateInstance" ) );
+						if( createInstance != nullptr )
+						{
+							return createInstance;
+						}
+					}
+
+					return nullptr;
+				}();
+
+			if( ourCreateInstance == nullptr )
+			{
+				throw std::runtime_error( "Failed to locate dxcompiler.dll for DXC shader compilation." );
+			}
+
+			return ourCreateInstance;
+		}
+
+		CompiledShader CompileShader( const ShaderStageSource& stage, const char* defaultProfile )
+		{
+			const char* profile = stage.profile != nullptr ? stage.profile : defaultProfile;
+			if( stage.source == nullptr || profile == nullptr )
+			{
+				throw std::runtime_error( "Shader source or profile is invalid." );
+			}
+
+			if( !IsShaderModel6Profile( profile ) )
+			{
+				CompiledShader compiledShader;
+				ComPtr<ID3DBlob> errors;
+				detail::ThrowIfFailed(
+					D3DCompile(
+						stage.source,
+						std::strlen( stage.source ),
+						nullptr,
+						nullptr,
+						nullptr,
+						stage.entryPoint,
+						profile,
+						0,
+						0,
+						compiledShader.d3dBlob_.GetAddressOf(),
+						errors.GetAddressOf() ),
+					"Failed to compile shader with D3DCompile." );
+				return compiledShader;
+			}
+
+			const auto createInstance = LoadDxcCreateInstance();
+
+			ComPtr<IDxcUtils> utils;
+			ComPtr<IDxcCompiler3> compiler;
+			detail::ThrowIfFailed( createInstance( CLSID_DxcUtils, __uuidof( IDxcUtils ), reinterpret_cast<void**>( utils.GetAddressOf() ) ), "Failed to create IDxcUtils." );
+			detail::ThrowIfFailed( createInstance( CLSID_DxcCompiler, __uuidof( IDxcCompiler3 ), reinterpret_cast<void**>( compiler.GetAddressOf() ) ), "Failed to create IDxcCompiler3." );
+
+			ComPtr<IDxcIncludeHandler> includeHandler;
+			detail::ThrowIfFailed( utils->CreateDefaultIncludeHandler( includeHandler.GetAddressOf() ), "Failed to create DXC include handler." );
+
+			const std::wstring entryPoint = ToWide( stage.entryPoint != nullptr ? stage.entryPoint : "main" );
+			const std::wstring targetProfile = ToWide( profile );
+
+			std::array<LPCWSTR, 8> arguments = {
+				L"-E",
+				entryPoint.c_str(),
+				L"-T",
+				targetProfile.c_str(),
+				L"-HV",
+				L"2021",
+				DXC_ARG_WARNINGS_ARE_ERRORS,
+				DXC_ARG_PACK_MATRIX_ROW_MAJOR,
+			};
+
+			DxcBuffer sourceBuffer{};
+			sourceBuffer.Ptr = stage.source;
+			sourceBuffer.Size = std::strlen( stage.source );
+			sourceBuffer.Encoding = DXC_CP_UTF8;
+
+			ComPtr<IDxcResult> result;
+			detail::ThrowIfFailed(
+				compiler->Compile(
+					&sourceBuffer,
+					arguments.data(),
+					static_cast<UINT32>( arguments.size() ),
+					includeHandler.Get(),
+					__uuidof( IDxcResult ),
+					reinterpret_cast<void**>( result.GetAddressOf() ) ),
+				"Failed to invoke DXC shader compilation." );
+
+			HRESULT status = S_OK;
+			detail::ThrowIfFailed( result->GetStatus( &status ), "Failed to query DXC compilation status." );
+			if( FAILED( status ) )
+			{
+				ComPtr<IDxcBlobUtf8> errors;
+				if( SUCCEEDED( result->GetOutput( DXC_OUT_ERRORS, __uuidof( IDxcBlobUtf8 ), reinterpret_cast<void**>( errors.GetAddressOf() ), nullptr ) ) && errors != nullptr && errors->GetStringLength() > 0 )
+				{
+					throw std::runtime_error( errors->GetStringPointer() );
+				}
+
+				throw std::runtime_error( "Failed to compile shader with DXC." );
+			}
+
+			CompiledShader compiledShader;
+			detail::ThrowIfFailed(
+				result->GetOutput( DXC_OUT_OBJECT, __uuidof( IDxcBlob ), reinterpret_cast<void**>( compiledShader.dxcBlob_.GetAddressOf() ), nullptr ),
+				"Failed to retrieve DXC shader bytecode." );
+			return compiledShader;
+		}
+	}
+
 	RenderPipelineDesc::RenderPipelineDesc() noexcept
 	{
 		blendState = CD3DX12_BLEND_DESC( D3D12_DEFAULT );
@@ -104,52 +285,38 @@ namespace lightd3d12
 			throw std::runtime_error( "RenderPipelineDesc requires valid vertex and fragment shader source." );
 		}
 
-		ComPtr<ID3DBlob> vsBlob;
-		ComPtr<ID3DBlob> psBlob;
-		ComPtr<ID3DBlob> errors;
-
-		detail::ThrowIfFailed(
-			D3DCompile(
-				desc.vertexShader.source,
-				std::strlen( desc.vertexShader.source ),
-				nullptr,
-				nullptr,
-				nullptr,
-				desc.vertexShader.entryPoint,
-				desc.vertexShader.profile ? desc.vertexShader.profile : "vs_5_1",
-				0,
-				0,
-				vsBlob.GetAddressOf(),
-				errors.GetAddressOf() ),
-			"Failed to compile vertex shader." );
-
-		errors.Reset();
-		detail::ThrowIfFailed(
-			D3DCompile(
-				desc.fragmentShader.source,
-				std::strlen( desc.fragmentShader.source ),
-				nullptr,
-				nullptr,
-				nullptr,
-				desc.fragmentShader.entryPoint,
-				desc.fragmentShader.profile ? desc.fragmentShader.profile : "ps_5_1",
-				0,
-				0,
-				psBlob.GetAddressOf(),
-				errors.GetAddressOf() ),
-			"Failed to compile fragment shader." );
+		const CompiledShader vertexShader = CompileShader( desc.vertexShader, "vs_5_1" );
+		const CompiledShader fragmentShader = CompileShader( desc.fragmentShader, "ps_5_1" );
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
 		psoDesc.pRootSignature = impl.rootSignature_.Get();
-		psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
-		psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+		psoDesc.VS = vertexShader.Bytecode();
+		psoDesc.PS = fragmentShader.Bytecode();
 		psoDesc.BlendState = desc.blendState;
 		psoDesc.RasterizerState = desc.rasterizerState;
 		psoDesc.DepthStencilState = desc.depthStencilState;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = desc.primitiveType;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[ 0 ] = desc.colorFormat;
+
+		uint32_t numRenderTargets = 0;
+		for( uint32_t index = 0; index < desc.color.size(); ++index )
+		{
+			if( desc.color[ index ].format == DXGI_FORMAT_UNKNOWN )
+			{
+				continue;
+			}
+
+			psoDesc.RTVFormats[ numRenderTargets ] = desc.color[ index ].format;
+			numRenderTargets++;
+		}
+
+		if( numRenderTargets == 0 && desc.colorFormat != DXGI_FORMAT_UNKNOWN )
+		{
+			psoDesc.RTVFormats[ 0 ] = desc.colorFormat;
+			numRenderTargets = 1;
+		}
+
+		psoDesc.NumRenderTargets = numRenderTargets;
 		psoDesc.DSVFormat = desc.depthFormat;
 		psoDesc.SampleDesc = { 1, 0 };
 

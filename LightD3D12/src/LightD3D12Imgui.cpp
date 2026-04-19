@@ -186,4 +186,18 @@ namespace lightd3d12
 		impl_->MakeCurrent();
 		return ImGui_ImplWin32_WndProcHandler( hwnd, message, wParam, lParam ) != 0;
 	}
+
+	D3D12_GPU_DESCRIPTOR_HANDLE ImguiRenderer::GetTextureGpuDescriptor( TextureHandle texture ) const
+	{
+		auto& manager = *impl_->deviceManager_.impl_;
+		const TextureResource& resource = manager.GetTextureResource( texture );
+		if( resource.srvIndex_ == UINT32_MAX )
+		{
+			throw std::runtime_error( "Texture does not have an SRV descriptor." );
+		}
+
+		D3D12_GPU_DESCRIPTOR_HANDLE handle = manager.bindlessHeap_->GetGPUDescriptorHandleForHeapStart();
+		handle.ptr += static_cast< UINT64 >( resource.srvIndex_ ) * manager.bindlessDescriptorSize_;
+		return handle;
+	}
 }

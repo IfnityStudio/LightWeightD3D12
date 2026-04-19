@@ -23,6 +23,7 @@
 namespace lightd3d12
 {
 	using Microsoft::WRL::ComPtr;
+	static constexpr uint32_t ourMaxColorAttachments = D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
 
 	struct BufferResource;
 	struct TextureResource;
@@ -107,7 +108,7 @@ namespace lightd3d12
 
 	struct RenderPass
 	{
-		std::array<ColorAttachmentDesc, 1> color = {};
+		std::array<ColorAttachmentDesc, ourMaxColorAttachments> color = {};
 		DepthStencilAttachmentDesc depthStencil = {};
 	};
 
@@ -123,8 +124,13 @@ namespace lightd3d12
 
 	struct Framebuffer
 	{
-		std::array<ColorAttachment, 1> color = {};
+		std::array<ColorAttachment, ourMaxColorAttachments> color = {};
 		DepthStencilAttachment depthStencil = {};
+	};
+
+	struct RenderPipelineColorAttachmentDesc
+	{
+		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
 	};
 
 	struct ShaderStageSource
@@ -138,6 +144,7 @@ namespace lightd3d12
 	{
 		RenderPipelineDesc() noexcept;
 
+		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = {};
 		ShaderStageSource vertexShader = {};
 		ShaderStageSource fragmentShader = {};
 		D3D12_BLEND_DESC blendState = {};
@@ -233,6 +240,7 @@ namespace lightd3d12
 
 		virtual void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) = 0;
 		virtual void CmdEndRendering() = 0;
+		virtual void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) = 0;
 		virtual void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) = 0;
 		virtual void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0 ) = 0;
 		virtual void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 ) = 0;

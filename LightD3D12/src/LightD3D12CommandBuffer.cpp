@@ -8,7 +8,7 @@ namespace lightd3d12
 {
 	namespace
 	{
-		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateBeginningAccess( LoadOp loadOp, const std::array<float, 4>& clearColor )
+		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateBeginningAccess( LoadOp loadOp, DXGI_FORMAT format, const std::array<float, 4>& clearColor )
 		{
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beginningAccess{};
 
@@ -20,6 +20,7 @@ namespace lightd3d12
 
 				case LoadOp::Clear:
 					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+					beginningAccess.Clear.ClearValue.Format = format;
 					std::memcpy( beginningAccess.Clear.ClearValue.Color, clearColor.data(), sizeof( float ) * clearColor.size() );
 					break;
 
@@ -114,14 +115,19 @@ namespace lightd3d12
 			throw std::runtime_error( "Nested render passes are not supported." );
 		}
 
-		std::array<D3D12_RENDER_PASS_RENDER_TARGET_DESC, 1> renderTargetDescs{};
+		std::array<D3D12_RENDER_PASS_RENDER_TARGET_DESC, ourMaxColorAttachments> renderTargetDescs{};
 		uint32_t numRenderTargets = 0;
 
 		TextureResource* viewportTexture = nullptr;
 
-		if( framebuffer.color[ 0 ].texture.Valid() )
+		for( uint32_t index = 0; index < framebuffer.color.size(); ++index )
 		{
-			auto& colorTexture = manager_.GetTextureResource( framebuffer.color[ 0 ].texture );
+			if( !framebuffer.color[ index ].texture.Valid() )
+			{
+				continue;
+			}
+
+			auto& colorTexture = manager_.GetTextureResource( framebuffer.color[ index ].texture );
 			if( colorTexture.rtvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Color attachment does not have an RTV." );
@@ -137,11 +143,15 @@ namespace lightd3d12
 				colorTexture.currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			}
 
-			renderTargetDescs[ 0 ].cpuDescriptor = colorTexture.rtvHandle_;
-			renderTargetDescs[ 0 ].BeginningAccess = CreateBeginningAccess( renderPass.color[ 0 ].loadOp, renderPass.color[ 0 ].clearColor );
-			renderTargetDescs[ 0 ].EndingAccess = CreateEndingAccess( renderPass.color[ 0 ].storeOp );
-			numRenderTargets = 1;
-			viewportTexture = &colorTexture;
+			renderTargetDescs[ numRenderTargets ].cpuDescriptor = colorTexture.rtvHandle_;
+			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess( renderPass.color[ index ].loadOp, colorTexture.format_, renderPass.color[ index ].clearColor );
+			renderTargetDescs[ numRenderTargets ].EndingAccess = CreateEndingAccess( renderPass.color[ index ].storeOp );
+			numRenderTargets++;
+
+			if( viewportTexture == nullptr )
+			{
+				viewportTexture = &colorTexture;
+			}
 		}
 
 		D3D12_RENDER_PASS_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -218,6 +228,22 @@ namespace lightd3d12
 
 		wrapper_.commandList_->EndRenderPass();
 		isRendering_ = false;
+	}
+
+	void CommandBufferImpl::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )
+	{
+		TextureResource& resource = manager_.GetTextureResource( texture );
+		if( resource.currentState_ == newState )
+		{
+			return;
+		}
+
+		const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			resource.resource_.Get(),
+			resource.currentState_,
+			newState );
+		wrapper_.commandList_->ResourceBarrier( 1, &barrier );
+		resource.currentState_ = newState;
 	}
 
 	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )

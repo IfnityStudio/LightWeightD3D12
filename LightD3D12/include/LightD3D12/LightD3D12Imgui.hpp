@@ -19,6 +19,7 @@ namespace lightd3d12
 		void NewFrame();
 		void Render( ICommandBuffer& commandBuffer );
 		bool ProcessMessage( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam );
+		D3D12_GPU_DESCRIPTOR_HANDLE GetTextureGpuDescriptor( TextureHandle texture ) const;
 
 	private:
 		struct Impl;

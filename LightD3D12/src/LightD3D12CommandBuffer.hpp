@@ -14,6 +14,7 @@ namespace lightd3d12
 
 		void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) override;
 		void CmdEndRendering() override;
+		void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) override;
 		void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) override;
 		void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0 ) override;
 		void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 ) override;
