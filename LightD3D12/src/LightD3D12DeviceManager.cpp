@@ -32,7 +32,10 @@ namespace lightd3d12
 		InitializeDescriptorHeaps();
 		InitializeRootSignature();
 		InitializeCommandSignature();
-		immediateCommands_ = std::make_unique<ImmediateCommands>( device_.Get(), commandQueue_.Get(), std::max<uint32_t>( 1u, desc_.framesInFlight ) );
+		immediateCommands_ = std::make_unique<ImmediateCommands>(
+			device_.Get(),
+			commandQueue_.Get(),
+			std::max( std::max<uint32_t>( 1u, desc_.framesInFlight ), ourMaxActiveCommandBuffers ) );
 		stagingDevice_ = std::make_unique<StagingDevice>( *this );
 		CreateSwapchain();
 	}
@@ -386,7 +389,10 @@ namespace lightd3d12
 
 	void DeviceManager::Impl::Shutdown() noexcept
 	{
-		currentCommandBuffer_.reset();
+		for( auto& activeCommandBuffer : activeCommandBuffers_ )
+		{
+			activeCommandBuffer.reset();
+		}
 
 		try
 		{

@@ -5,6 +5,7 @@
 #include "LightD3D12ImmediateCommands.hpp"
 #include "LightD3D12Resources.hpp"
 
+#include <array>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -18,6 +19,8 @@ namespace lightd3d12
 	class DeviceManager::Impl final
 	{
 	public:
+		static constexpr uint32_t ourMaxActiveCommandBuffers = 4;
+
 		explicit Impl( const ContextDesc& desc, const SwapchainDesc& swapchainDesc );
 		~Impl();
 
@@ -75,7 +78,7 @@ namespace lightd3d12
 		SlotMap<TextureResource> slotMapTextures_;
 		std::unique_ptr<ImmediateCommands> immediateCommands_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
-		std::unique_ptr<CommandBufferImpl> currentCommandBuffer_;
+		std::array<std::unique_ptr<CommandBufferImpl>, ourMaxActiveCommandBuffers> activeCommandBuffers_ = {};
 		bool bindlessSupported_ = false;
 
 		struct DeferredRelease

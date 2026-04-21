@@ -224,15 +224,25 @@ namespace lightd3d12
 	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
 		auto& impl = *manager_->impl_;
-		if( impl.currentCommandBuffer_ != nullptr )
+		std::unique_ptr<CommandBufferImpl>* availableSlot = nullptr;
+		for(std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : impl.activeCommandBuffers_ )
 		{
-			throw std::runtime_error( "Only one active command buffer is allowed per render device." );
+			if( activeCommandBuffer == nullptr )
+			{
+				availableSlot = &activeCommandBuffer;
+				break;
+			}
+		}
+
+		if( availableSlot == nullptr )
+		{
+			throw std::runtime_error( "A maximum of four active command buffers are allowed per render device." );
 		}
 
 		impl.ProcessDeferredReleases();
 		auto& wrapper = impl.immediateCommands_->Acquire();
-		impl.currentCommandBuffer_ = std::make_unique<CommandBufferImpl>( impl, wrapper );
-		return *impl.currentCommandBuffer_;
+		*availableSlot = std::make_unique<CommandBufferImpl>( impl, wrapper );
+		return **availableSlot;
 	}
 
 	TextureHandle RenderDevice::GetCurrentSwapchainTexture() const
@@ -250,29 +260,61 @@ namespace lightd3d12
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
 		CommandBufferImpl* commandBuffer = dynamic_cast<CommandBufferImpl*>( &buffer );
-		if( commandBuffer == nullptr || commandBuffer != impl.currentCommandBuffer_.get() )
+		if( commandBuffer == nullptr )
 		{
 			throw std::runtime_error( "The command buffer does not belong to this render device." );
 		}
 
-		TextureResource& texture = impl.GetTextureResource( presentTexture );
-		if( texture.currentState_ != D3D12_RESOURCE_STATE_PRESENT )
+		std::unique_ptr<CommandBufferImpl>* activeSlot = nullptr;
+		for( auto& activeCommandBuffer : impl.activeCommandBuffers_ )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				texture.resource_.Get(),
-				texture.currentState_,
-				D3D12_RESOURCE_STATE_PRESENT );
-			commandBuffer->Wrapper().commandList_->ResourceBarrier( 1, &barrier );
-			texture.currentState_ = D3D12_RESOURCE_STATE_PRESENT;
+			if( activeCommandBuffer.get() == commandBuffer )
+			{
+				activeSlot = &activeCommandBuffer;
+				break;
+			}
 		}
 
-		const SubmitHandle handle = impl.immediateCommands_->Submit( commandBuffer->Wrapper() );
-		if( impl.swapchain_ == nullptr )
+		if( activeSlot == nullptr )
 		{
-			throw std::runtime_error( "Swapchain is not initialized." );
+			throw std::runtime_error( "The command buffer does not belong to this render device." );
 		}
-		impl.swapchain_->Present();
-		impl.currentCommandBuffer_.reset();
+
+		if( commandBuffer->IsRendering() )
+		{
+			throw std::runtime_error( "Cannot submit a command buffer while a render pass is still active." );
+		}
+
+		if( presentTexture.Valid() )
+		{
+			commandBuffer->CmdTransitionTexture( presentTexture, D3D12_RESOURCE_STATE_PRESENT );
+		}
+
+		auto submitFixup = commandBuffer->BuildSubmitFixup();
+		const SubmitHandle handle = impl.immediateCommands_->Submit( commandBuffer->Wrapper(), submitFixup.commandList_.Get() );
+		commandBuffer->CommitSubmittedTextureStates();
+		if( submitFixup.Valid() )
+		{
+			impl.AddDeferredRelease(
+				handle,
+				[allocator = std::move( submitFixup.allocator_ ), commandList = std::move( submitFixup.commandList_ )]() mutable
+				{
+					commandList.Reset();
+					allocator.Reset();
+				} );
+		}
+
+		activeSlot->reset();
+
+		if( presentTexture.Valid() )
+		{
+			if( impl.swapchain_ == nullptr )
+			{
+				throw std::runtime_error( "Swapchain is not initialized." );
+			}
+
+			impl.swapchain_->Present();
+		}
 		impl.ProcessDeferredReleases();
 		return handle;
 	}

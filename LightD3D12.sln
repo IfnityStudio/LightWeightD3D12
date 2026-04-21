@@ -10,6 +10,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloDeferred", "
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloSprites", "samples\HelloSprites\HelloSprites.vcxproj", "{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloCube", "samples\HelloCube\HelloCube.vcxproj", "{6C8D222D-C988-4AD5-89EC-14C621AABB6B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MiniEngine2D", "samples\MiniEngine2D\MiniEngine2D.vcxproj", "{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -32,6 +36,14 @@ Global
 		{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}.Debug|x64.Build.0 = Debug|x64
 		{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}.Release|x64.ActiveCfg = Release|x64
 		{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}.Release|x64.Build.0 = Release|x64
+		{6C8D222D-C988-4AD5-89EC-14C621AABB6B}.Debug|x64.ActiveCfg = Debug|x64
+		{6C8D222D-C988-4AD5-89EC-14C621AABB6B}.Debug|x64.Build.0 = Debug|x64
+		{6C8D222D-C988-4AD5-89EC-14C621AABB6B}.Release|x64.ActiveCfg = Release|x64
+		{6C8D222D-C988-4AD5-89EC-14C621AABB6B}.Release|x64.Build.0 = Release|x64
+		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Debug|x64.ActiveCfg = Debug|x64
+		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Debug|x64.Build.0 = Debug|x64
+		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Release|x64.ActiveCfg = Release|x64
+		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

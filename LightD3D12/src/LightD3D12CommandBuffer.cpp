@@ -108,6 +108,100 @@ namespace lightd3d12
 	{
 	}
 
+	CommandBufferImpl::TrackedTextureState& CommandBufferImpl::GetTrackedTextureState( TextureHandle texture )
+	{
+		for( auto& trackedTexture : trackedTextures_ )
+		{
+			if( trackedTexture.handle_ == texture )
+			{
+				return trackedTexture;
+			}
+		}
+
+		const TextureResource& resource = manager_.GetTextureResource( texture );
+		TrackedTextureState trackedTexture;
+		trackedTexture.handle_ = texture;
+		trackedTexture.initialState_ = resource.currentState_;
+		trackedTexture.currentState_ = resource.currentState_;
+		trackedTextures_.push_back( trackedTexture );
+		return trackedTextures_.back();
+	}
+
+	void CommandBufferImpl::TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState )
+	{
+		auto& trackedTexture = GetTrackedTextureState( texture );
+		if( trackedTexture.currentState_ == newState )
+		{
+			return;
+		}
+
+		const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			resource.resource_.Get(),
+			trackedTexture.currentState_,
+			newState );
+		wrapper_.commandList_->ResourceBarrier( 1, &barrier );
+		trackedTexture.currentState_ = newState;
+	}
+
+	CommandBufferImpl::SubmitFixupResources CommandBufferImpl::BuildSubmitFixup()
+	{
+		bool requiresFixup = false;
+		for( const auto& trackedTexture : trackedTextures_ )
+		{
+			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
+			if( resource.currentState_ != trackedTexture.initialState_ )
+			{
+				requiresFixup = true;
+				break;
+			}
+		}
+
+		if( !requiresFixup )
+		{
+			return {};
+		}
+
+		SubmitFixupResources fixup;
+		detail::ThrowIfFailed(
+			manager_.device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( fixup.allocator_.GetAddressOf() ) ),
+			"Failed to create command allocator for submit fixup." );
+		detail::ThrowIfFailed(
+			manager_.device_->CreateCommandList(
+				0,
+				D3D12_COMMAND_LIST_TYPE_DIRECT,
+				fixup.allocator_.Get(),
+				nullptr,
+				IID_PPV_ARGS( fixup.commandList_.GetAddressOf() ) ),
+			"Failed to create command list for submit fixup." );
+
+		for( const auto& trackedTexture : trackedTextures_ )
+		{
+			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
+			if( resource.currentState_ == trackedTexture.initialState_ )
+			{
+				continue;
+			}
+
+			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				resource.resource_.Get(),
+				resource.currentState_,
+				trackedTexture.initialState_ );
+			fixup.commandList_->ResourceBarrier( 1, &barrier );
+		}
+
+		detail::ThrowIfFailed( fixup.commandList_->Close(), "Failed to close submit fixup command list." );
+		return fixup;
+	}
+
+	void CommandBufferImpl::CommitSubmittedTextureStates()
+	{
+		for( const auto& trackedTexture : trackedTextures_ )
+		{
+			TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
+			resource.currentState_ = trackedTexture.currentState_;
+		}
+	}
+
 	void CommandBufferImpl::CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer )
 	{
 		if( isRendering_ )
@@ -133,15 +227,7 @@ namespace lightd3d12
 				throw std::runtime_error( "Color attachment does not have an RTV." );
 			}
 
-			if( colorTexture.currentState_ != D3D12_RESOURCE_STATE_RENDER_TARGET )
-			{
-				const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-					colorTexture.resource_.Get(),
-					colorTexture.currentState_,
-					D3D12_RESOURCE_STATE_RENDER_TARGET );
-				wrapper_.commandList_->ResourceBarrier( 1, &barrier );
-				colorTexture.currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			}
+			TransitionTexture( framebuffer.color[ index ].texture, colorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
 			renderTargetDescs[ numRenderTargets ].cpuDescriptor = colorTexture.rtvHandle_;
 			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess( renderPass.color[ index ].loadOp, colorTexture.format_, renderPass.color[ index ].clearColor );
@@ -165,15 +251,7 @@ namespace lightd3d12
 				throw std::runtime_error( "Depth attachment does not have a DSV." );
 			}
 
-			if( depthTexture.currentState_ != D3D12_RESOURCE_STATE_DEPTH_WRITE )
-			{
-				const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-					depthTexture.resource_.Get(),
-					depthTexture.currentState_,
-					D3D12_RESOURCE_STATE_DEPTH_WRITE );
-				wrapper_.commandList_->ResourceBarrier( 1, &barrier );
-				depthTexture.currentState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-			}
+			TransitionTexture( framebuffer.depthStencil.texture, depthTexture, D3D12_RESOURCE_STATE_DEPTH_WRITE );
 
 			depthStencilDesc.cpuDescriptor = depthTexture.dsvHandle_;
 			depthStencilDesc.DepthBeginningAccess = depthTexture.isDepthFormat_
@@ -233,17 +311,7 @@ namespace lightd3d12
 	void CommandBufferImpl::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )
 	{
 		TextureResource& resource = manager_.GetTextureResource( texture );
-		if( resource.currentState_ == newState )
-		{
-			return;
-		}
-
-		const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			resource.resource_.Get(),
-			resource.currentState_,
-			newState );
-		wrapper_.commandList_->ResourceBarrier( 1, &barrier );
-		resource.currentState_ = newState;
+		TransitionTexture( texture, resource, newState );
 	}
 
 	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )

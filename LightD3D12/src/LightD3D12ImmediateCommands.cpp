@@ -1,5 +1,7 @@
 #include "LightD3D12ImmediateCommands.hpp"
 
+#include <array>
+
 namespace lightd3d12
 {
 	ImmediateCommands::ImmediateCommands( ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t numContexts ):
@@ -116,12 +118,24 @@ namespace lightd3d12
 
 	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper )
 	{
+		return Submit( wrapper, nullptr );
+	}
+
+	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper, ID3D12CommandList* submitPrologue )
+	{
 		assert( wrapper.isEncoding_ );
 
 		detail::ThrowIfFailed( wrapper.commandList_->Close(), "Failed to close immediate command list." );
 
-		ID3D12CommandList* commandLists[] = { wrapper.commandList_.Get() };
-		queue_->ExecuteCommandLists( 1, commandLists );
+		std::array<ID3D12CommandList*, 2> commandLists = {};
+		uint32_t numCommandLists = 0;
+		if( submitPrologue != nullptr )
+		{
+			commandLists[ numCommandLists++ ] = submitPrologue;
+		}
+		commandLists[ numCommandLists++ ] = wrapper.commandList_.Get();
+
+		queue_->ExecuteCommandLists( numCommandLists, commandLists.data() );
 		detail::ThrowIfFailed( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
 
 		wrapper.fenceValue_ = fenceCounter_;

@@ -27,6 +27,7 @@ namespace lightd3d12
 
 		CommandListWrapper& Acquire();
 		SubmitHandle Submit( CommandListWrapper& wrapper );
+		SubmitHandle Submit( CommandListWrapper& wrapper, ID3D12CommandList* submitPrologue );
 		SubmitHandle GetLastSubmitHandle() const noexcept;
 		SubmitHandle GetNextSubmitHandle() const noexcept;
 		bool IsReady( SubmitHandle handle, bool fastCheckNoD3D12 = false ) const;

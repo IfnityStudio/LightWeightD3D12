@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <wincodec.h>
@@ -46,6 +47,10 @@ namespace
 		std::unique_ptr<DeviceManager> deviceManager;
 		RenderPipelineState spritePipeline;
 		TextureHandle enemyTexture = {};
+		TextureHandle spriteLayerA = {};
+		TextureHandle spriteLayerB = {};
+		uint32_t layerWidth_ = 0;
+		uint32_t layerHeight_ = 0;
 		bool running = true;
 		bool minimized = false;
 	};
@@ -230,6 +235,128 @@ float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 				return DefWindowProc( hwnd, message, wParam, lParam );
 		}
 	}
+
+	TextureHandle CreateSpriteLayer( RenderDevice& renderDevice, uint32_t width, uint32_t height )
+	{
+		TextureDesc textureDesc{};
+		textureDesc.debugName = "Sprite Layer";
+		textureDesc.width = width;
+		textureDesc.height = height;
+		textureDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		textureDesc.flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+		textureDesc.createShaderResourceView = true;
+		textureDesc.createRenderTargetView = true;
+		textureDesc.useClearValue = true;
+		textureDesc.clearValue.Format = textureDesc.format;
+		textureDesc.clearValue.Color[ 0 ] = 0.0f;
+		textureDesc.clearValue.Color[ 1 ] = 0.0f;
+		textureDesc.clearValue.Color[ 2 ] = 0.0f;
+		textureDesc.clearValue.Color[ 3 ] = 0.0f;
+		return renderDevice.CreateTexture( textureDesc );
+	}
+
+	void RecreateSpriteLayers( AppState& app, uint32_t width, uint32_t height )
+	{
+		RenderDevice& renderDevice = *app.deviceManager->GetRenderDevice();
+		renderDevice.WaitIdle();
+
+		if( app.spriteLayerA.Valid() )
+		{
+			renderDevice.Destroy( app.spriteLayerA );
+			app.spriteLayerA = {};
+		}
+
+		if( app.spriteLayerB.Valid() )
+		{
+			renderDevice.Destroy( app.spriteLayerB );
+			app.spriteLayerB = {};
+		}
+
+		app.spriteLayerA = CreateSpriteLayer( renderDevice, width, height );
+		app.spriteLayerB = CreateSpriteLayer( renderDevice, width, height );
+		app.layerWidth_ = width;
+		app.layerHeight_ = height;
+	}
+
+	void RecordSpriteBatch(
+		ICommandBuffer& buffer,
+		const RenderPipelineState& pipeline,
+		TextureHandle target,
+		uint32_t textureIndex,
+		uint32_t screenWidth,
+		uint32_t screenHeight,
+		const SpriteDesc* sprites,
+		size_t numSprites,
+		const std::array<float, 4>& clearColor )
+	{
+		RenderPass renderPass{};
+		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
+		renderPass.color[ 0 ].clearColor = clearColor;
+
+		Framebuffer framebuffer{};
+		framebuffer.color[ 0 ].texture = target;
+
+		buffer.CmdBeginRendering( renderPass, framebuffer );
+		buffer.CmdBindRenderPipeline( pipeline );
+		buffer.CmdPushDebugGroupLabel( "Render Sprites Batch", 0xff00b8ff );
+
+		for( size_t index = 0; index < numSprites; ++index )
+		{
+			const SpriteDesc& sprite = sprites[ index ];
+			SpritePushConstants constants{};
+			constants.x = sprite.x;
+			constants.y = sprite.y;
+			constants.width = sprite.size;
+			constants.height = sprite.size;
+			constants.screenWidth = static_cast<float>( screenWidth );
+			constants.screenHeight = static_cast<float>( screenHeight );
+			constants.textureIndex = textureIndex;
+			buffer.CmdPushConstants( &constants, sizeof( constants ) );
+			buffer.CmdDraw( 6 );
+		}
+
+		buffer.CmdPopDebugGroupLabel();
+		buffer.CmdEndRendering();
+	}
+
+	void RecordCompositePass(
+		ICommandBuffer& buffer,
+		const RenderPipelineState& pipeline,
+		TextureHandle backbuffer,
+		uint32_t layerATextureIndex,
+		uint32_t layerBTextureIndex,
+		uint32_t screenWidth,
+		uint32_t screenHeight )
+	{
+		RenderPass renderPass{};
+		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
+		renderPass.color[ 0 ].clearColor = { 0.08f, 0.10f, 0.14f, 1.0f };
+
+		Framebuffer framebuffer{};
+		framebuffer.color[ 0 ].texture = backbuffer;
+
+		buffer.CmdBeginRendering( renderPass, framebuffer );
+		buffer.CmdBindRenderPipeline( pipeline );
+		buffer.CmdPushDebugGroupLabel( "Composite Sprite Layers", 0xff00b8ff );
+
+		const std::array<uint32_t, 2> layerTextureIndices = { layerATextureIndex, layerBTextureIndex };
+		for( uint32_t layerTextureIndex : layerTextureIndices )
+		{
+			SpritePushConstants constants{};
+			constants.x = 0.0f;
+			constants.y = 0.0f;
+			constants.width = static_cast<float>( screenWidth );
+			constants.height = static_cast<float>( screenHeight );
+			constants.screenWidth = static_cast<float>( screenWidth );
+			constants.screenHeight = static_cast<float>( screenHeight );
+			constants.textureIndex = layerTextureIndex;
+			buffer.CmdPushConstants( &constants, sizeof( constants ) );
+			buffer.CmdDraw( 6 );
+		}
+
+		buffer.CmdPopDebugGroupLabel();
+		buffer.CmdEndRendering();
+	}
 }
 
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
@@ -306,6 +433,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		textureDesc.rowPitch = enemyImage.width * 4u;
 		textureDesc.slicePitch = static_cast<uint32_t>( enemyImage.pixels.size() );
 		app.enemyTexture = ctx.CreateTexture( textureDesc );
+		RecreateSpriteLayers( app, app.deviceManager->GetWidth(), app.deviceManager->GetHeight() );
 
 		const std::array<SpriteDesc, 6> sprites = {
 			SpriteDesc{ 48.0f, 48.0f, 128.0f },
@@ -337,43 +465,85 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				continue;
 			}
 
-			auto& buffer = renderDevice->AcquireCommandBuffer();
-			const TextureHandle backbuffer = renderDevice->GetCurrentSwapchainTexture();
-
-			RenderPass renderPass{};
-			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-			renderPass.color[ 0 ].clearColor = { 0.08f, 0.10f, 0.14f, 1.0f };
-
-			Framebuffer framebuffer{};
-			framebuffer.color[ 0 ].texture = backbuffer;
-
-			buffer.CmdBeginRendering( renderPass, framebuffer );
-			buffer.CmdBindRenderPipeline( app.spritePipeline );
-			buffer.CmdPushDebugGroupLabel( "Render Sprites", 0xff00b8ff );
-
-			for( const SpriteDesc& sprite : sprites )
+			if( !app.spriteLayerA.Valid() || !app.spriteLayerB.Valid() || app.layerWidth_ != app.deviceManager->GetWidth() || app.layerHeight_ != app.deviceManager->GetHeight() )
 			{
-				SpritePushConstants constants{};
-				constants.x = sprite.x;
-				constants.y = sprite.y;
-				constants.width = sprite.size;
-				constants.height = sprite.size;
-				constants.screenWidth = static_cast<float>( app.deviceManager->GetWidth() );
-				constants.screenHeight = static_cast<float>( app.deviceManager->GetHeight() );
-				constants.textureIndex = renderDevice->GetBindlessIndex( app.enemyTexture );
-				buffer.CmdPushConstants( &constants, sizeof( constants ) );
-				buffer.CmdDraw( 6 );
+				RecreateSpriteLayers( app, app.deviceManager->GetWidth(), app.deviceManager->GetHeight() );
 			}
 
-			buffer.CmdPopDebugGroupLabel();
-			buffer.CmdEndRendering();
-			renderDevice->Submit( buffer, backbuffer );
+			const TextureHandle backbuffer = renderDevice->GetCurrentSwapchainTexture();
+			const uint32_t screenWidth = app.deviceManager->GetWidth();
+			const uint32_t screenHeight = app.deviceManager->GetHeight();
+			const uint32_t enemyTextureIndex = renderDevice->GetBindlessIndex( app.enemyTexture );
+			const uint32_t layerATextureIndex = renderDevice->GetBindlessIndex( app.spriteLayerA );
+			const uint32_t layerBTextureIndex = renderDevice->GetBindlessIndex( app.spriteLayerB );
+			auto& layerBufferA = renderDevice->AcquireCommandBuffer();
+			auto& layerBufferB = renderDevice->AcquireCommandBuffer();
+
+			const size_t batchSplit = sprites.size() / 2u;
+			std::array<std::exception_ptr, 2> recordExceptions = {};
+			std::thread workerA(
+				[&]()
+				{
+					RecordSpriteBatch(
+						layerBufferA,
+						app.spritePipeline,
+						app.spriteLayerA,
+						enemyTextureIndex,
+						screenWidth,
+						screenHeight,
+						sprites.data(),
+						batchSplit,
+						{ 0.0f, 0.0f, 0.0f, 0.0f });
+
+				});
+
+			std::thread workerB(
+				[&]()
+				{
+					RecordSpriteBatch(
+						layerBufferB,
+						app.spritePipeline,
+						app.spriteLayerB,
+						enemyTextureIndex,
+						screenWidth,
+						screenHeight,
+						sprites.data() + batchSplit,
+						sprites.size() - batchSplit,
+						{ 0.0f, 0.0f, 0.0f, 0.0f });
+
+				} );
+			workerA.join();
+			workerB.join();
+
+			renderDevice->Submit( layerBufferA, {} );
+			renderDevice->Submit( layerBufferB, {} );
+
+			auto& compositeBuffer = renderDevice->AcquireCommandBuffer();
+			RecordCompositePass(
+				compositeBuffer,
+				app.spritePipeline,
+				backbuffer,
+				layerATextureIndex,
+				layerBTextureIndex,
+				screenWidth,
+				screenHeight );
+			renderDevice->Submit( compositeBuffer, backbuffer );
 		}
 
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
 		if( app.deviceManager )
 		{
 			app.deviceManager->WaitIdle();
+			if( app.spriteLayerA.Valid() )
+			{
+				app.deviceManager->GetRenderDevice()->Destroy( app.spriteLayerA );
+				app.spriteLayerA = {};
+			}
+			if( app.spriteLayerB.Valid() )
+			{
+				app.deviceManager->GetRenderDevice()->Destroy( app.spriteLayerB );
+				app.spriteLayerB = {};
+			}
 			if( app.enemyTexture.Valid() )
 			{
 				app.deviceManager->GetRenderDevice()->Destroy( app.enemyTexture );
