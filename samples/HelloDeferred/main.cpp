@@ -241,9 +241,7 @@ float4 main(float4 svPosition : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 		colorDesc.width = width;
 		colorDesc.height = height;
 		colorDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		colorDesc.flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		colorDesc.createShaderResourceView = true;
-		colorDesc.createRenderTargetView = true;
+		colorDesc.usage = TextureUsage::Sampled | TextureUsage::RenderTarget;
 		colorDesc.useClearValue = true;
 		colorDesc.clearValue.Format = colorDesc.format;
 		colorDesc.clearValue.Color[ 0 ] = 0.08f;
@@ -257,9 +255,7 @@ float4 main(float4 svPosition : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 		positionDesc.width = width;
 		positionDesc.height = height;
 		positionDesc.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		positionDesc.flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		positionDesc.createShaderResourceView = true;
-		positionDesc.createRenderTargetView = true;
+		positionDesc.usage = TextureUsage::Sampled | TextureUsage::RenderTarget;
 		positionDesc.useClearValue = true;
 		positionDesc.clearValue.Format = positionDesc.format;
 		positionDesc.clearValue.Color[ 0 ] = 0.0f;

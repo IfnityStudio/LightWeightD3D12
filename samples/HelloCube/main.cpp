@@ -198,9 +198,7 @@ float4 main(float4 position : SV_Position, float3 color : COLOR0) : SV_Target0
 		depthDesc.width = width;
 		depthDesc.height = height;
 		depthDesc.format = DXGI_FORMAT_D32_FLOAT;
-		depthDesc.flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-		depthDesc.createShaderResourceView = false;
-		depthDesc.createDepthStencilView = true;
+		depthDesc.usage = TextureUsage::DepthStencil;
 		depthDesc.useClearValue = true;
 		depthDesc.clearValue.Format = depthDesc.format;
 		depthDesc.clearValue.DepthStencil.Depth = 1.0f;

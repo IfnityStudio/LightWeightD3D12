@@ -243,9 +243,7 @@ float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 		textureDesc.width = width;
 		textureDesc.height = height;
 		textureDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		textureDesc.flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		textureDesc.createShaderResourceView = true;
-		textureDesc.createRenderTargetView = true;
+		textureDesc.usage = TextureUsage::Sampled | TextureUsage::RenderTarget;
 		textureDesc.useClearValue = true;
 		textureDesc.clearValue.Format = textureDesc.format;
 		textureDesc.clearValue.Color[ 0 ] = 0.0f;
@@ -428,7 +426,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		textureDesc.width = enemyImage.width;
 		textureDesc.height = enemyImage.height;
 		textureDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		textureDesc.createShaderResourceView = true;
+		textureDesc.usage = TextureUsage::Sampled;
 		textureDesc.data = enemyImage.pixels.data();
 		textureDesc.rowPitch = enemyImage.width * 4u;
 		textureDesc.slicePitch = static_cast<uint32_t>( enemyImage.pixels.size() );

@@ -8,6 +8,7 @@
 
 #include <array>
 #include <future>
+#include <memory>
 #include <unordered_map>
 
 namespace mini2d
@@ -29,7 +30,9 @@ namespace mini2d
 			for( const std::vector<ActorId>& layer : layers )
 			{
 				MINI_PROFILE_SCOPE( "TickScheduler::ExecuteLayer" );
-				const WorldSnapshot snapshot = world.CreateSnapshot();
+				// Keep one immutable snapshot per layer and share it across all async jobs.
+				// This preserves the original tick semantics while avoiding a large snapshot copy per actor.
+				const auto snapshot = std::make_shared<const WorldSnapshot>( world.CreateSnapshot() );
 				std::vector<std::future<std::vector<GameCommand>>> asyncJobs;
 
 				for( ActorId actorId : layer )
@@ -45,7 +48,7 @@ namespace mini2d
 						const Actor* constActor = actor;
 						asyncJobs.push_back( taskScheduler.Submit( [snapshot, constActor, deltaTime]()
 							{
-								return constActor->TickAsync( snapshot, deltaTime );
+								return constActor->TickAsync( *snapshot, deltaTime );
 							} ) );
 						++stats.asyncTicks;
 					}

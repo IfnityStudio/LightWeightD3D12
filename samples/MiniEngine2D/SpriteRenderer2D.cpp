@@ -91,7 +91,7 @@ namespace mini2d
 			textureDesc.width = 1;
 			textureDesc.height = 1;
 			textureDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-			textureDesc.createShaderResourceView = true;
+			textureDesc.usage = TextureUsage::Sampled;
 			textureDesc.data = ourWhitePixel;
 			textureDesc.rowPitch = 4;
 			textureDesc.slicePitch = 4;
@@ -208,7 +208,7 @@ float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0, float4 tint : 
 		textureDesc.width = image.width;
 		textureDesc.height = image.height;
 		textureDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		textureDesc.createShaderResourceView = true;
+		textureDesc.usage = TextureUsage::Sampled;
 		textureDesc.data = image.pixels.data();
 		textureDesc.rowPitch = image.width * 4u;
 		textureDesc.slicePitch = static_cast<uint32_t>( image.pixels.size() );

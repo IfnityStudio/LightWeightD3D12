@@ -37,6 +37,15 @@ namespace lightd3d12
 
 	struct TextureResource final
 	{
+		struct ResolvedFormats final
+		{
+			DXGI_FORMAT resource_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT srv_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT uav_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT rtv_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT dsv_ = DXGI_FORMAT_UNKNOWN;
+		};
+
 		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetRTV() const noexcept
 		{
 			return rtvHandle_;
@@ -52,6 +61,11 @@ namespace lightd3d12
 			return srvHandle_;
 		}
 
+		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetUAV() const noexcept
+		{
+			return uavHandle_;
+		}
+
 		static bool IsDepthFormat( DXGI_FORMAT format ) noexcept;
 		static bool IsDepthStencilFormat( DXGI_FORMAT format ) noexcept;
 
@@ -59,13 +73,16 @@ namespace lightd3d12
 		D3D12_RESOURCE_FLAGS usageFlags_ = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
 		DXGI_FORMAT format_ = DXGI_FORMAT_UNKNOWN;
+		ResolvedFormats formats_ = {};
 		D3D12_RESOURCE_DESC desc_ = {};
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_{ 0 };
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{ 0 };
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE uavHandle_{ 0 };
 		uint32_t rtvIndex_ = UINT32_MAX;
 		uint32_t dsvIndex_ = UINT32_MAX;
 		uint32_t srvIndex_ = UINT32_MAX;
+		uint32_t uavIndex_ = UINT32_MAX;
 		uint32_t width_ = 0;
 		uint32_t height_ = 0;
 		bool isDepthFormat_ = false;

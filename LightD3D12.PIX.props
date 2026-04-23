@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
+    <LightD3D12EnablePix Condition="'$(LightD3D12EnablePix)'==''">false</LightD3D12EnablePix>
+    <LightD3D12PixRuntimeDir Condition="'$(LightD3D12PixRuntimeDir)'=='' and '$(PIX_EVENT_RUNTIME_DIR)'!=''">$(PIX_EVENT_RUNTIME_DIR)</LightD3D12PixRuntimeDir>
+    <LightD3D12PixRuntimeDir Condition="'$(LightD3D12PixRuntimeDir)'==''"></LightD3D12PixRuntimeDir>
+    <LightD3D12PixCapturerDir Condition="'$(LightD3D12PixCapturerDir)'=='' and '$(PIX_GPU_CAPTURER_DIR)'!=''">$(PIX_GPU_CAPTURER_DIR)</LightD3D12PixCapturerDir>
+    <LightD3D12PixCapturerDir Condition="'$(LightD3D12PixCapturerDir)'==''"></LightD3D12PixCapturerDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(LightD3D12EnablePix)'=='true' or '$(LightD3D12EnablePix)'=='1'">
+    <ClCompile>
+      <PreprocessorDefinitions>LIGHTD3D12_ENABLE_PIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <Target
+    Name="LightD3D12CopyPixRuntime"
+    AfterTargets="Build"
+    Condition="('$(LightD3D12EnablePix)'=='true' or '$(LightD3D12EnablePix)'=='1') and '$(ConfigurationType)'!='StaticLibrary' and '$(LightD3D12PixRuntimeDir)'!='' and Exists('$(LightD3D12PixRuntimeDir)\\WinPixEventRuntime.dll')">
+    <Message Text="Copying WinPixEventRuntime.dll from $(LightD3D12PixRuntimeDir)" Importance="High" />
+    <Copy
+      SourceFiles="$(LightD3D12PixRuntimeDir)\\WinPixEventRuntime.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target
+    Name="LightD3D12CopyPixCapturer"
+    AfterTargets="Build"
+    Condition="('$(LightD3D12EnablePix)'=='true' or '$(LightD3D12EnablePix)'=='1') and '$(ConfigurationType)'!='StaticLibrary' and '$(LightD3D12PixCapturerDir)'!='' and Exists('$(LightD3D12PixCapturerDir)\\WinPixGpuCapturer.dll')">
+    <Message Text="Copying WinPixGpuCapturer.dll from $(LightD3D12PixCapturerDir)" Importance="High" />
+    <Copy
+      SourceFiles="$(LightD3D12PixCapturerDir)\\WinPixGpuCapturer.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
+</Project>

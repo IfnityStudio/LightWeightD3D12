@@ -4,9 +4,149 @@
 #include "LightD3D12Swapchain.hpp"
 
 #include <algorithm>
+#include <cstdlib>
+#include <filesystem>
+#include <vector>
 
 namespace lightd3d12
 {
+	namespace
+	{
+#if defined( LIGHTD3D12_ENABLE_PIX )
+		std::vector<uint32_t> ParseVersionComponents( const std::wstring& versionText )
+		{
+			std::vector<uint32_t> components;
+			size_t start = 0;
+			while( start < versionText.size() )
+			{
+				const size_t end = versionText.find( L'.', start );
+				const std::wstring token = versionText.substr( start, end == std::wstring::npos ? std::wstring::npos : end - start );
+				if( token.empty() )
+				{
+					components.push_back( 0 );
+				}
+				else
+				{
+					components.push_back( static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) ) );
+				}
+
+				if( end == std::wstring::npos )
+				{
+					break;
+				}
+
+				start = end + 1;
+			}
+
+			return components;
+		}
+
+		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
+		{
+			const size_t count = std::max( left.size(), right.size() );
+			for( size_t index = 0; index < count; ++index )
+			{
+				const uint32_t leftValue = index < left.size() ? left[ index ] : 0u;
+				const uint32_t rightValue = index < right.size() ? right[ index ] : 0u;
+				if( leftValue != rightValue )
+				{
+					return leftValue > rightValue;
+				}
+			}
+
+			return false;
+		}
+
+		bool TryLoadPixGpuCapturerInternal()
+		{
+			static bool ourAttemptedLoad = false;
+			if( ourAttemptedLoad )
+			{
+				return ::GetModuleHandleW( L"WinPixGpuCapturer.dll" ) != nullptr;
+			}
+
+			ourAttemptedLoad = true;
+			if( ::GetModuleHandleW( L"WinPixGpuCapturer.dll" ) != nullptr )
+			{
+				return true;
+			}
+
+			// First allow a local copy next to the executable or on PATH.
+			if( ::LoadLibraryW( L"WinPixGpuCapturer.dll" ) != nullptr )
+			{
+				return true;
+			}
+
+			wchar_t* programFilesValue = nullptr;
+			size_t programFilesLength = 0;
+			if( _wdupenv_s( &programFilesValue, &programFilesLength, L"ProgramFiles" ) != 0 || programFilesValue == nullptr || programFilesValue[ 0 ] == L'\0' )
+			{
+				free( programFilesValue );
+				return false;
+			}
+
+			const std::filesystem::path pixInstallRoot = std::filesystem::path( programFilesValue ) / "Microsoft PIX";
+			free( programFilesValue );
+			if( !std::filesystem::exists( pixInstallRoot ) )
+			{
+				return false;
+			}
+
+			std::filesystem::path latestCapturerPath;
+			std::vector<uint32_t> latestVersion;
+
+			for( const auto& entry : std::filesystem::directory_iterator( pixInstallRoot ) )
+			{
+				if( !entry.is_directory() )
+				{
+					continue;
+				}
+
+				const std::filesystem::path candidateDll = entry.path() / "WinPixGpuCapturer.dll";
+				if( !std::filesystem::exists( candidateDll ) )
+				{
+					continue;
+				}
+
+				const std::vector<uint32_t> candidateVersion = ParseVersionComponents( entry.path().filename().wstring() );
+				if( latestCapturerPath.empty() || IsVersionGreater( candidateVersion, latestVersion ) )
+				{
+					latestCapturerPath = candidateDll;
+					latestVersion = candidateVersion;
+				}
+			}
+
+			if( !latestCapturerPath.empty() )
+			{
+				if( ::LoadLibraryW( latestCapturerPath.c_str() ) != nullptr )
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+#endif
+	}
+
+	bool TryLoadPixGpuCapturer() noexcept
+	{
+#if defined( LIGHTD3D12_ENABLE_PIX )
+		return TryLoadPixGpuCapturerInternal();
+#else
+		return false;
+#endif
+	}
+
+	bool IsPixGpuCapturerLoaded() noexcept
+	{
+#if defined( LIGHTD3D12_ENABLE_PIX )
+		return ::GetModuleHandleW( L"WinPixGpuCapturer.dll" ) != nullptr;
+#else
+		return false;
+#endif
+	}
+
 	DeviceManager::Impl::Impl( const ContextDesc& desc, const SwapchainDesc& swapchainDesc ):
 		desc_( desc ),
 		swapchainDesc_( swapchainDesc )
@@ -20,6 +160,12 @@ namespace lightd3d12
 
 	void DeviceManager::Impl::Initialize()
 	{
+		if( desc_.enablePixGpuCapture )
+		{
+			// PIX GPU capture attach only works if the capturer DLL is loaded before any D3D12 device creation.
+			TryLoadPixGpuCapturer();
+		}
+
 		InitializeFactory();
 		InitializeDevice();
 		InitializeCommandQueue();
@@ -191,12 +337,14 @@ namespace lightd3d12
 
 		D3D12_STATIC_SAMPLER_DESC sampler{};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		// Clamp is safer as the engine-wide default because ImGui also uses this root signature.
+		// UI atlases and preview images can show wrapped glyph bleed if the shared sampler uses WRAP.
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		sampler.ShaderRegister = 0;
 		sampler.RegisterSpace = 0;
-		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc{};

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -49,8 +50,40 @@ namespace lightd3d12
 		return { NativeWindowHandle::Type::Win32Hwnd, hwnd };
 	}
 
+	// Call this before creating DeviceManager if you want PIX GPU capture attach support.
+	// When PIX support is disabled or the capturer DLL is unavailable, this safely returns false.
+	bool TryLoadPixGpuCapturer() noexcept;
+	bool IsPixGpuCapturerLoaded() noexcept;
+
 	using TextureHandle = Handle<TextureResource>;
 	using BufferHandle = Handle<BufferResource>;
+
+	inline std::string BuildScopedCommandLabel( const char* functionSignature )
+	{
+		if( functionSignature == nullptr || functionSignature[ 0 ] == '\0' )
+		{
+			return {};
+		}
+
+		std::string_view signature( functionSignature );
+		std::string_view functionName = signature;
+		if( const size_t openParenthesis = signature.find( '(' ); openParenthesis != std::string_view::npos )
+		{
+			functionName = signature.substr( 0, openParenthesis );
+		}
+
+		while( !functionName.empty() && functionName.back() == ' ' )
+		{
+			functionName.remove_suffix( 1 );
+		}
+
+		if( const size_t lastSpace = functionName.rfind( ' ' ); lastSpace != std::string_view::npos )
+		{
+			functionName.remove_prefix( lastSpace + 1 );
+		}
+
+		return std::string( functionName );
+	}
 
 	struct SubmitHandle
 	{
@@ -156,6 +189,11 @@ namespace lightd3d12
 		DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
 	};
 
+	struct ComputePipelineDesc
+	{
+		ShaderStageSource computeShader = {};
+	};
+
 	struct BufferDesc
 	{
 		std::string debugName;
@@ -170,6 +208,36 @@ namespace lightd3d12
 		uint64_t dataSize = 0;
 	};
 
+	enum class TextureUsage : uint32_t
+	{
+		None = 0,
+		Sampled = 1u << 0,
+		RenderTarget = 1u << 1,
+		DepthStencil = 1u << 2,
+		UnorderedAccess = 1u << 3,
+	};
+
+	constexpr TextureUsage operator|( TextureUsage lhs, TextureUsage rhs ) noexcept
+	{
+		return static_cast<TextureUsage>( static_cast<uint32_t>( lhs ) | static_cast<uint32_t>( rhs ) );
+	}
+
+	constexpr TextureUsage operator&( TextureUsage lhs, TextureUsage rhs ) noexcept
+	{
+		return static_cast<TextureUsage>( static_cast<uint32_t>( lhs ) & static_cast<uint32_t>( rhs ) );
+	}
+
+	inline TextureUsage& operator|=( TextureUsage& lhs, TextureUsage rhs ) noexcept
+	{
+		lhs = lhs | rhs;
+		return lhs;
+	}
+
+	constexpr bool HasTextureUsage( TextureUsage usage, TextureUsage bit ) noexcept
+	{
+		return ( usage & bit ) != TextureUsage::None;
+	}
+
 	struct TextureDesc
 	{
 		std::string debugName;
@@ -178,11 +246,8 @@ namespace lightd3d12
 		uint16_t mipLevels = 1;
 		uint16_t depthOrArraySize = 1;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+		TextureUsage usage = TextureUsage::Sampled;
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
-		bool createShaderResourceView = true;
-		bool createRenderTargetView = false;
-		bool createDepthStencilView = false;
 		const void* data = nullptr;
 		uint32_t rowPitch = 0;
 		uint32_t slicePitch = 0;
@@ -195,6 +260,7 @@ namespace lightd3d12
 		bool enableDebugLayer = true;
 		bool preferHighPerformanceAdapter = true;
 		bool allowTearing = true;
+		bool enablePixGpuCapture = false;
 		uint32_t framesInFlight = 3;
 		uint32_t bindlessCapacity = 4096;
 		uint32_t rtvCapacity = 256;
@@ -233,6 +299,26 @@ namespace lightd3d12
 		D3D_PRIMITIVE_TOPOLOGY topology_ = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	};
 
+	class ComputePipelineState
+	{
+	public:
+		ComputePipelineState() = default;
+		ComputePipelineState( ComputePipelineState&& other ) noexcept;
+		ComputePipelineState& operator=( ComputePipelineState&& other ) noexcept;
+		ComputePipelineState( const ComputePipelineState& ) = delete;
+		ComputePipelineState& operator=( const ComputePipelineState& ) = delete;
+		~ComputePipelineState() = default;
+
+		bool Valid() const noexcept;
+
+	private:
+		friend class Context;
+		friend class RenderDevice;
+		friend class CommandBufferImpl;
+
+		ComPtr<ID3D12PipelineState> pipelineState_;
+	};
+
 	class ICommandBuffer
 	{
 	public:
@@ -242,6 +328,7 @@ namespace lightd3d12
 		virtual void CmdEndRendering() = 0;
 		virtual void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) = 0;
 		virtual void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) = 0;
+		virtual void CmdBindComputePipeline( const ComputePipelineState& pipeline ) = 0;
 		virtual void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0 ) = 0;
 		virtual void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 ) = 0;
 		virtual void CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues = 0 ) = 0;
@@ -249,6 +336,43 @@ namespace lightd3d12
 		virtual void CmdPopDebugGroupLabel() = 0;
 		virtual void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 ) = 0;
 		virtual void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) = 0;
+		virtual void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) = 0;
+	};
+
+	class ScopedCommandDebugGroup final
+	{
+	public:
+		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, std::string label, uint32_t color = 0xff4cc9f0u ):
+			commandBuffer_( &commandBuffer ),
+			label_( std::move( label ) ),
+			active_( !label_.empty() )
+		{
+			if( active_ )
+			{
+				commandBuffer_->CmdPushDebugGroupLabel( label_.c_str(), color );
+			}
+		}
+
+		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, const char* label, uint32_t color = 0xff4cc9f0u ):
+			ScopedCommandDebugGroup( commandBuffer, label != nullptr ? std::string( label ) : std::string{}, color )
+		{
+		}
+
+		~ScopedCommandDebugGroup()
+		{
+			if( active_ )
+			{
+				commandBuffer_->CmdPopDebugGroupLabel();
+			}
+		}
+
+		ScopedCommandDebugGroup( const ScopedCommandDebugGroup& ) = delete;
+		ScopedCommandDebugGroup& operator=( const ScopedCommandDebugGroup& ) = delete;
+
+	private:
+		ICommandBuffer* commandBuffer_ = nullptr;
+		std::string label_;
+		bool active_ = false;
 	};
 
 	class DeviceManager;
@@ -262,10 +386,12 @@ namespace lightd3d12
 		SubmitHandle Submit( ICommandBuffer& buffer, TextureHandle presentTexture );
 
 		RenderPipelineState CreateRenderPipeline( const RenderPipelineDesc& desc );
+		ComputePipelineState CreateComputePipeline( const ComputePipelineDesc& desc );
 		BufferHandle CreateBuffer( const BufferDesc& desc );
 		TextureHandle CreateTexture( const TextureDesc& desc );
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
+		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
 		bool BindlessSupported() const noexcept;
 		void WaitIdle();
 		void Destroy( BufferHandle buffer );
@@ -308,4 +434,16 @@ namespace lightd3d12
 		RenderDevice renderDevice_;
 	};
 }
+
+#define LIGHTD3D12_DETAIL_CONCAT_INNER( a, b ) a##b
+#define LIGHTD3D12_DETAIL_CONCAT( a, b ) LIGHTD3D12_DETAIL_CONCAT_INNER( a, b )
+#if defined( _MSC_VER )
+	#define LIGHTD3D12_DETAIL_FUNCTION_SIGNATURE __FUNCSIG__
+#elif defined( __clang__ ) || defined( __GNUC__ )
+	#define LIGHTD3D12_DETAIL_FUNCTION_SIGNATURE __PRETTY_FUNCTION__
+#else
+	#define LIGHTD3D12_DETAIL_FUNCTION_SIGNATURE __FUNCTION__
+#endif
+#define LIGHTD3D12_CMD_SCOPE( commandBuffer ) ::lightd3d12::ScopedCommandDebugGroup LIGHTD3D12_DETAIL_CONCAT( lightd3d12CmdScope_, __LINE__ )( commandBuffer, ::lightd3d12::BuildScopedCommandLabel( LIGHTD3D12_DETAIL_FUNCTION_SIGNATURE ) )
+#define LIGHTD3D12_CMD_SCOPE_NAMED( commandBuffer, label, color ) ::lightd3d12::ScopedCommandDebugGroup LIGHTD3D12_DETAIL_CONCAT( lightd3d12CmdScope_, __LINE__ )( commandBuffer, label, color )
 

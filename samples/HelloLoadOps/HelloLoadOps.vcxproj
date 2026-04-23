@@ -12,9 +12,9 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <ProjectGuid>{1EB3F251-2C0C-4A35-A104-A0AF4E6F33E3}</ProjectGuid>
+    <ProjectGuid>{A7F1B9D2-5C63-4D80-A7B2-1EAF45D708D2}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>LightD3D12HelloInstancing</RootNamespace>
+    <RootNamespace>LightD3D12HelloLoadOps</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -45,7 +45,7 @@
   <PropertyGroup>
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName>LightD3D12HelloInstancing</TargetName>
+    <TargetName>LightD3D12HelloLoadOps</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

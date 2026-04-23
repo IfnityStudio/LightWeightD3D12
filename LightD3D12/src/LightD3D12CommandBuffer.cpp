@@ -2,12 +2,201 @@
 
 #include "LightD3D12ManagerImpl.hpp"
 
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <mutex>
+#include <vector>
+
+#if defined( LIGHTD3D12_ENABLE_PIX )
+	#define LIGHTD3D12_INTERNAL_PIX_ENABLED 1
+#else
+	#define LIGHTD3D12_INTERNAL_PIX_ENABLED 0
+#endif
 
 namespace lightd3d12
 {
 	namespace
 	{
+#if LIGHTD3D12_INTERNAL_PIX_ENABLED
+		std::vector<uint32_t> ParseVersionComponents( const std::wstring& versionText )
+		{
+			std::vector<uint32_t> components;
+			size_t start = 0;
+			while( start < versionText.size() )
+			{
+				const size_t end = versionText.find( L'.', start );
+				const std::wstring token = versionText.substr( start, end == std::wstring::npos ? std::wstring::npos : end - start );
+				if( token.empty() )
+				{
+					components.push_back( 0 );
+				}
+				else
+				{
+					components.push_back( static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) ) );
+				}
+
+				if( end == std::wstring::npos )
+				{
+					break;
+				}
+
+				start = end + 1;
+			}
+
+			return components;
+		}
+
+		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
+		{
+			const size_t count = std::max( left.size(), right.size() );
+			for( size_t index = 0; index < count; ++index )
+			{
+				const uint32_t leftValue = index < left.size() ? left[ index ] : 0u;
+				const uint32_t rightValue = index < right.size() ? right[ index ] : 0u;
+				if( leftValue != rightValue )
+				{
+					return leftValue > rightValue;
+				}
+			}
+
+			return false;
+		}
+
+		std::filesystem::path FindPixEventRuntimePath()
+		{
+			// First allow a local copy next to the executable or on PATH.
+			if( ::GetModuleHandleW( L"WinPixEventRuntime.dll" ) != nullptr )
+			{
+				return L"WinPixEventRuntime.dll";
+			}
+
+			// Then try the standard NuGet cache location, which is where the PIX event runtime is commonly installed.
+			wchar_t* userProfileValue = nullptr;
+			size_t userProfileLength = 0;
+			if( _wdupenv_s( &userProfileValue, &userProfileLength, L"USERPROFILE" ) == 0 &&
+				userProfileValue != nullptr &&
+				userProfileValue[ 0 ] != L'\0' )
+			{
+				const std::filesystem::path runtimeRoot =
+					std::filesystem::path( userProfileValue ) / ".nuget" / "packages" / "winpixeventruntime";
+				free( userProfileValue );
+				if( std::filesystem::exists( runtimeRoot ) )
+				{
+					std::filesystem::path latestRuntimePath;
+					std::vector<uint32_t> latestVersion;
+					for( const auto& entry : std::filesystem::directory_iterator( runtimeRoot ) )
+					{
+						if( !entry.is_directory() )
+						{
+							continue;
+						}
+
+						const std::filesystem::path candidateDll = entry.path() / "bin" / "x64" / "WinPixEventRuntime.dll";
+						if( !std::filesystem::exists( candidateDll ) )
+						{
+							continue;
+						}
+
+						const std::vector<uint32_t> candidateVersion = ParseVersionComponents( entry.path().filename().wstring() );
+						if( latestRuntimePath.empty() || IsVersionGreater( candidateVersion, latestVersion ) )
+						{
+							latestRuntimePath = candidateDll;
+							latestVersion = candidateVersion;
+						}
+					}
+
+					if( !latestRuntimePath.empty() )
+					{
+						return latestRuntimePath;
+					}
+				}
+			}
+			else
+			{
+				free( userProfileValue );
+			}
+
+			return {};
+		}
+
+		struct PixRuntime final
+		{
+			using BeginEventOnCommandListFn = void( WINAPI* )( ID3D12GraphicsCommandList*, UINT64, PCSTR );
+			using EndEventOnCommandListFn = void( WINAPI* )( ID3D12GraphicsCommandList* );
+
+			~PixRuntime()
+			{
+				if( module_ != nullptr )
+				{
+					::FreeLibrary( module_ );
+				}
+			}
+
+			bool Available()
+			{
+				std::call_once( initFlag_, [this]()
+					{
+						const std::filesystem::path runtimePath = FindPixEventRuntimePath();
+						if( runtimePath.empty() )
+						{
+							return;
+						}
+
+						module_ = ::LoadLibraryW( runtimePath.c_str() );
+						if( module_ == nullptr )
+						{
+							return;
+						}
+
+						beginEventOnCommandList_ = reinterpret_cast<BeginEventOnCommandListFn>( ::GetProcAddress( module_, "PIXBeginEventOnCommandList" ) );
+						endEventOnCommandList_ = reinterpret_cast<EndEventOnCommandListFn>( ::GetProcAddress( module_, "PIXEndEventOnCommandList" ) );
+						if( beginEventOnCommandList_ == nullptr || endEventOnCommandList_ == nullptr )
+						{
+							::FreeLibrary( module_ );
+							module_ = nullptr;
+							beginEventOnCommandList_ = nullptr;
+							endEventOnCommandList_ = nullptr;
+							return;
+						}
+
+						available_ = true;
+					} );
+
+				return available_;
+			}
+
+			void BeginEvent( ID3D12GraphicsCommandList* commandList, uint64_t color, const char* label )
+			{
+				if( Available() )
+				{
+					beginEventOnCommandList_( commandList, color, label );
+				}
+			}
+
+			void EndEvent( ID3D12GraphicsCommandList* commandList )
+			{
+				if( Available() )
+				{
+					endEventOnCommandList_( commandList );
+				}
+			}
+
+		private:
+			std::once_flag initFlag_;
+			HMODULE module_ = nullptr;
+			BeginEventOnCommandListFn beginEventOnCommandList_ = nullptr;
+			EndEventOnCommandListFn endEventOnCommandList_ = nullptr;
+			bool available_ = false;
+		};
+
+		PixRuntime& GetPixRuntime()
+		{
+			static PixRuntime runtime;
+			return runtime;
+		}
+#endif
+
 		D3D12_RENDER_PASS_BEGINNING_ACCESS CreateBeginningAccess( LoadOp loadOp, DXGI_FORMAT format, const std::array<float, 4>& clearColor )
 		{
 			D3D12_RENDER_PASS_BEGINNING_ACCESS beginningAccess{};
@@ -230,7 +419,10 @@ namespace lightd3d12
 			TransitionTexture( framebuffer.color[ index ].texture, colorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
 			renderTargetDescs[ numRenderTargets ].cpuDescriptor = colorTexture.rtvHandle_;
-			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess( renderPass.color[ index ].loadOp, colorTexture.format_, renderPass.color[ index ].clearColor );
+			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess(
+				renderPass.color[ index ].loadOp,
+				colorTexture.formats_.rtv_ != DXGI_FORMAT_UNKNOWN ? colorTexture.formats_.rtv_ : colorTexture.format_,
+				renderPass.color[ index ].clearColor );
 			renderTargetDescs[ numRenderTargets ].EndingAccess = CreateEndingAccess( renderPass.color[ index ].storeOp );
 			numRenderTargets++;
 
@@ -255,13 +447,19 @@ namespace lightd3d12
 
 			depthStencilDesc.cpuDescriptor = depthTexture.dsvHandle_;
 			depthStencilDesc.DepthBeginningAccess = depthTexture.isDepthFormat_
-				? CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp, depthTexture.format_, renderPass.depthStencil.clearDepth )
+				? CreateDepthBeginningAccess(
+					renderPass.depthStencil.depthLoadOp,
+					depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
+					renderPass.depthStencil.clearDepth )
 				: CreateNoAccessBeginningAccess();
 			depthStencilDesc.DepthEndingAccess = depthTexture.isDepthFormat_
 				? CreateEndingAccess( renderPass.depthStencil.depthStoreOp )
 				: CreateNoAccessEndingAccess();
 			depthStencilDesc.StencilBeginningAccess = depthTexture.isStencilFormat_
-				? CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp, depthTexture.format_, renderPass.depthStencil.clearStencil )
+				? CreateStencilBeginningAccess(
+					renderPass.depthStencil.stencilLoadOp,
+					depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
+					renderPass.depthStencil.clearStencil )
 				: CreateNoAccessBeginningAccess();
 			depthStencilDesc.StencilEndingAccess = depthTexture.isStencilFormat_
 				? CreateEndingAccess( renderPass.depthStencil.stencilStoreOp )
@@ -323,6 +521,14 @@ namespace lightd3d12
 		wrapper_.commandList_->IASetPrimitiveTopology( pipeline.topology_ );
 	}
 
+	void CommandBufferImpl::CmdBindComputePipeline( const ComputePipelineState& pipeline )
+	{
+		ID3D12DescriptorHeap* heaps[] = { manager_.bindlessHeap_.Get() };
+		wrapper_.commandList_->SetDescriptorHeaps( 1, heaps );
+		wrapper_.commandList_->SetComputeRootSignature( manager_.rootSignature_.Get() );
+		wrapper_.commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
+	}
+
 	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset )
 	{
 		const auto& resource = manager_.GetBufferResource( buffer );
@@ -343,15 +549,21 @@ namespace lightd3d12
 
 	void CommandBufferImpl::CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues )
 	{
+		wrapper_.commandList_->SetGraphicsRootSignature( manager_.rootSignature_.Get() );
+		wrapper_.commandList_->SetComputeRootSignature( manager_.rootSignature_.Get() );
 		wrapper_.commandList_->SetGraphicsRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
+		wrapper_.commandList_->SetComputeRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
 	}
 
-	void CommandBufferImpl::CmdPushDebugGroupLabel( const char* label, uint32_t )
+	void CommandBufferImpl::CmdPushDebugGroupLabel( const char* label, uint32_t color )
 	{
 		if( label != nullptr && label[ 0 ] != '\0' )
 		{
-			// Raw D3D12 BeginEvent expects PIX-encoded metadata, not a plain C string.
-			// Keep the API surface for future PIX integration, but avoid corrupting the command list.
+			#if LIGHTD3D12_INTERNAL_PIX_ENABLED
+				GetPixRuntime().BeginEvent( wrapper_.commandList_.Get(), static_cast<uint64_t>( color ), label );
+			#else
+				(void)color;
+			#endif
 			debugGroupDepth_++;
 		}
 	}
@@ -360,6 +572,9 @@ namespace lightd3d12
 	{
 		if( debugGroupDepth_ > 0 )
 		{
+			#if LIGHTD3D12_INTERNAL_PIX_ENABLED
+				GetPixRuntime().EndEvent( wrapper_.commandList_.Get() );
+			#endif
 			debugGroupDepth_--;
 		}
 	}
@@ -379,6 +594,11 @@ namespace lightd3d12
 			byteOffset,
 			nullptr,
 			0 );
+	}
+
+	void CommandBufferImpl::CmdDispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ )
+	{
+		wrapper_.commandList_->Dispatch( groupCountX, groupCountY, groupCountZ );
 	}
 }
 

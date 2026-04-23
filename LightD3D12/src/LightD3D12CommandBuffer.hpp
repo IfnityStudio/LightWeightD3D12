@@ -18,6 +18,7 @@ namespace lightd3d12
 		void CmdEndRendering() override;
 		void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) override;
 		void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) override;
+		void CmdBindComputePipeline( const ComputePipelineState& pipeline ) override;
 		void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0 ) override;
 		void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 ) override;
 		void CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues = 0 ) override;
@@ -25,6 +26,7 @@ namespace lightd3d12
 		void CmdPopDebugGroupLabel() override;
 		void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 ) override;
 		void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) override;
+		void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) override;
 
 		struct TrackedTextureState final
 		{

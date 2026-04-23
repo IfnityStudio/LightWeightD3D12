@@ -155,6 +155,8 @@ namespace lightd3d12
 			texture.usageFlags_ = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 			texture.currentState_ = D3D12_RESOURCE_STATE_PRESENT;
 			texture.format_ = surfaceFormat_;
+			texture.formats_.resource_ = surfaceFormat_;
+			texture.formats_.rtv_ = surfaceFormat_;
 			texture.desc_ = buffer->GetDesc();
 			texture.width_ = width_;
 			texture.height_ = height_;
