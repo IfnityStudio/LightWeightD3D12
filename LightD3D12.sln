@@ -20,6 +20,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloCompute", "s
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloShadowMapping", "samples\HelloShadowMapping\HelloShadowMapping.vcxproj", "{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloPostProcess", "samples\HelloPostProcess\HelloPostProcess.vcxproj", "{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MiniEngine2D", "samples\MiniEngine2D\MiniEngine2D.vcxproj", "{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}"
 EndProject
 Global
@@ -64,6 +66,10 @@ Global
 		{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}.Debug|x64.Build.0 = Debug|x64
 		{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}.Release|x64.ActiveCfg = Release|x64
 		{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}.Release|x64.Build.0 = Release|x64
+		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Debug|x64.ActiveCfg = Debug|x64
+		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Debug|x64.Build.0 = Debug|x64
+		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Release|x64.ActiveCfg = Release|x64
+		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Release|x64.Build.0 = Release|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Debug|x64.ActiveCfg = Debug|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Debug|x64.Build.0 = Debug|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Release|x64.ActiveCfg = Release|x64
