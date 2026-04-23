@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\samples\HelloDeferred\main.cpp">
+      <Filter>samples\HelloDeferred</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="samples">
+      <UniqueIdentifier>{E99A6A04-2AF8-3FFA-9DB3-C85D77F0B060}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="samples\HelloDeferred">
+      <UniqueIdentifier>{F795F230-A5DD-3BED-B866-F3EEF767388A}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

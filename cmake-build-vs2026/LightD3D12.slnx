@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="MinSizeRel"/>
+		<BuildType Name="RelWithDebInfo"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="d9fcdb8b-ddcc-3c9e-8f1a-b0fa6413c5df">
+		<BuildDependency Project="LightD3D12.vcxproj"/>
+		<BuildDependency Project="LightD3D12HelloCube.vcxproj"/>
+		<BuildDependency Project="LightD3D12HelloDeferred.vcxproj"/>
+		<BuildDependency Project="LightD3D12HelloSprites.vcxproj"/>
+		<BuildDependency Project="LightD3D12HelloTriangle.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Project Path="LightD3D12.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="af0c8d63-7f2d-3f7c-ba9e-739183de4137">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="LightD3D12HelloCube.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="1e41a1f6-7722-3c7b-baf1-3b799b553e95">
+		<BuildDependency Project="LightD3D12.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="LightD3D12HelloDeferred.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="7b5e1963-37b5-3da0-806e-1f90eee39205">
+		<BuildDependency Project="LightD3D12.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="LightD3D12HelloSprites.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="79d7a143-1d37-363c-83d0-bfac9a9afb61">
+		<BuildDependency Project="LightD3D12.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="LightD3D12HelloTriangle.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="d29ea0d7-5c1e-3c65-9438-f26969184d28" DefaultStartup="true">
+		<BuildDependency Project="LightD3D12.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="24ee08dc-00a6-37fb-8439-abdd22c2607c"/>
+</Solution>

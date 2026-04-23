@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12Resources.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12ImmediateCommands.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12CommandBuffer.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12StagingDevice.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12Swapchain.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12DeviceManager.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12RenderDevice.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12Imgui.cpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imgui.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imgui_draw.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imgui_tables.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imgui_widgets.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\include\LightD3D12\HandleSlotMap.hpp">
+      <Filter>LightD3D12\include\LightD3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\include\LightD3D12\LightD3D12.hpp">
+      <Filter>LightD3D12\include\LightD3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\include\LightD3D12\LightD3D12Imgui.hpp">
+      <Filter>LightD3D12\include\LightD3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12Internal.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12Resources.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12ImmediateCommands.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12CommandBuffer.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12StagingDevice.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12ManagerImpl.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\LightD3D12\src\LightD3D12Swapchain.hpp">
+      <Filter>LightD3D12\src</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imconfig.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imgui.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imgui_internal.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imstb_rectpack.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imstb_textedit.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\imstb_truetype.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\backends\imgui_impl_dx12.h">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\third_party\imgui\backends\imgui_impl_win32.h">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\alfon\OneDrive\EjemplosCodigo\LIGHTD3D12\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="LightD3D12">
+      <UniqueIdentifier>{19885F8C-9030-36B6-B67F-556F15917576}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LightD3D12\include">
+      <UniqueIdentifier>{CE56ED9D-D967-3514-BFA2-8F067BA98288}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LightD3D12\include\LightD3D12">
+      <UniqueIdentifier>{2A810AF4-7F49-3E6F-86FE-3A65735DC7DF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LightD3D12\src">
+      <UniqueIdentifier>{47E7A29E-79BA-3F33-AE92-F7883C5A0ABF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party">
+      <UniqueIdentifier>{44BC78A2-C2D8-3F0C-A5F2-577270D7D2EB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\imgui">
+      <UniqueIdentifier>{2860A12A-0277-3027-9AFF-4E5EBCC7D1B9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\imgui\backends">
+      <UniqueIdentifier>{928027CC-4960-3EAB-8690-9E0CAB331CC0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
