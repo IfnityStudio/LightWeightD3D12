@@ -112,6 +112,17 @@ namespace lightd3d12
 			}
 		}
 
+		bool ProcessMessage( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
+		{
+			if( !initialized_ || context_ == nullptr )
+			{
+				return false;
+			}
+
+			MakeCurrent();
+			return ImGui_ImplWin32_WndProcHandler( hwnd, message, wParam, lParam ) != 0;
+		}
+
 		static void AllocateSrvDescriptor( ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* outCpuDescriptor, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuDescriptor )
 		{
 			auto* self = static_cast< Impl* >( info->UserData );
@@ -158,6 +169,11 @@ namespace lightd3d12
 
 	void ImguiRenderer::NewFrame()
 	{
+		if( impl_ == nullptr )
+		{
+			return;
+		}
+
 		impl_->MakeCurrent();
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
@@ -166,6 +182,11 @@ namespace lightd3d12
 
 	void ImguiRenderer::Render( ICommandBuffer& commandBuffer )
 	{
+		if( impl_ == nullptr )
+		{
+			return;
+		}
+
 		impl_->MakeCurrent();
 		ImGui::Render();
 
@@ -183,12 +204,21 @@ namespace lightd3d12
 
 	bool ImguiRenderer::ProcessMessage( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
 	{
-		impl_->MakeCurrent();
-		return ImGui_ImplWin32_WndProcHandler( hwnd, message, wParam, lParam ) != 0;
+		if( impl_ == nullptr )
+		{
+			return false;
+		}
+
+		return impl_->ProcessMessage( hwnd, message, wParam, lParam );
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE ImguiRenderer::GetTextureGpuDescriptor( TextureHandle texture ) const
 	{
+		if( impl_ == nullptr )
+		{
+			throw std::runtime_error( "ImGui renderer is not initialized." );
+		}
+
 		auto& manager = *impl_->deviceManager_.impl_;
 		const TextureResource& resource = manager.GetTextureResource( texture );
 		if( resource.srvIndex_ == UINT32_MAX )

@@ -4,12 +4,16 @@
 #include "LightD3D12Swapchain.hpp"
 
 #include <dxcapi.h>
-#include <d3dcompiler.h>
+#include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <cstring>
+#include <cwctype>
 #include <filesystem>
 #include <fstream>
 #include <string_view>
+#include <system_error>
+#include <vector>
 
 namespace lightd3d12
 {
@@ -30,11 +34,6 @@ namespace lightd3d12
 				return { d3dBlob_->GetBufferPointer(), d3dBlob_->GetBufferSize() };
 			}
 		};
-
-		bool IsShaderModel6Profile( const char* profile ) noexcept
-		{
-			return profile != nullptr && std::strstr( profile, "_6_" ) != nullptr;
-		}
 
 		std::wstring ToWide( const char* text )
 		{
@@ -130,38 +129,220 @@ namespace lightd3d12
 			}
 		}
 
+		std::filesystem::path GetExecutableDirectory()
+		{
+			std::array<wchar_t, MAX_PATH> modulePath{};
+			const DWORD length = GetModuleFileNameW( nullptr, modulePath.data(), static_cast<DWORD>( modulePath.size() ) );
+			if( length == 0 )
+			{
+				return std::filesystem::current_path();
+			}
+
+			return std::filesystem::path( modulePath.data(), modulePath.data() + length ).parent_path();
+		}
+
+		std::wstring ToLowerAscii( std::wstring text )
+		{
+			std::transform( text.begin(), text.end(), text.begin(), []( wchar_t character )
+				{
+					return static_cast<wchar_t>( towlower( character ) );
+				} );
+			return text;
+		}
+
+		bool IsBlockedDxCompilerPath( const std::filesystem::path& path )
+		{
+			const std::wstring normalized = ToLowerAscii( path.wstring() );
+			return normalized.find( L"\\renderdoc\\plugins\\d3d12\\dxcompiler.dll" ) != std::wstring::npos ||
+				normalized.find( L"\\bravesoftware\\brave-browser\\" ) != std::wstring::npos;
+		}
+
+		bool HasSiblingDxil( const std::filesystem::path& compilerPath )
+		{
+			std::error_code error;
+			return std::filesystem::exists( compilerPath.parent_path() / "dxil.dll", error );
+		}
+
+		std::vector<uint32_t> ParseDottedVersion( std::wstring_view versionText )
+		{
+			std::vector<uint32_t> parts;
+			uint32_t current = 0;
+			bool hasDigits = false;
+
+			for( const wchar_t character : versionText )
+			{
+				if( character >= L'0' && character <= L'9' )
+				{
+					hasDigits = true;
+					current = current * 10u + static_cast<uint32_t>( character - L'0' );
+					continue;
+				}
+
+				if( character == L'.' )
+				{
+					parts.push_back( hasDigits ? current : 0u );
+					current = 0;
+					hasDigits = false;
+					continue;
+				}
+
+				return {};
+			}
+
+			if( hasDigits )
+			{
+				parts.push_back( current );
+			}
+
+			return parts;
+		}
+
+		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
+		{
+			const size_t partCount = std::max( left.size(), right.size() );
+			for( size_t index = 0; index < partCount; ++index )
+			{
+				const uint32_t leftPart = index < left.size() ? left[ index ] : 0u;
+				const uint32_t rightPart = index < right.size() ? right[ index ] : 0u;
+				if( leftPart != rightPart )
+				{
+					return leftPart > rightPart;
+				}
+			}
+
+			return false;
+		}
+
+		std::filesystem::path FindLatestWindowsSdkDxCompiler()
+		{
+			wchar_t* programFilesX86Raw = nullptr;
+			size_t programFilesX86Length = 0;
+			if( _wdupenv_s( &programFilesX86Raw, &programFilesX86Length, L"ProgramFiles(x86)" ) != 0 || programFilesX86Raw == nullptr )
+			{
+				return {};
+			}
+			const std::filesystem::path programFilesX86Path( programFilesX86Raw );
+			free( programFilesX86Raw );
+
+			const std::filesystem::path sdkBinDirectory = programFilesX86Path / "Windows Kits" / "10" / "bin";
+			std::error_code error;
+			if( !std::filesystem::exists( sdkBinDirectory, error ) )
+			{
+				return {};
+			}
+
+			std::filesystem::path bestCompilerPath;
+			std::vector<uint32_t> bestVersionParts;
+			for( const auto& entry : std::filesystem::directory_iterator( sdkBinDirectory, error ) )
+			{
+				if( error || !entry.is_directory( error ) )
+				{
+					continue;
+				}
+
+				const std::vector<uint32_t> versionParts = ParseDottedVersion( entry.path().filename().wstring() );
+				if( versionParts.empty() )
+				{
+					continue;
+				}
+
+				const std::filesystem::path candidateCompiler = entry.path() / "x64" / "dxcompiler.dll";
+				if( !HasSiblingDxil( candidateCompiler ) )
+				{
+					continue;
+				}
+
+				if( bestCompilerPath.empty() || IsVersionGreater( versionParts, bestVersionParts ) )
+				{
+					bestCompilerPath = candidateCompiler;
+					bestVersionParts = versionParts;
+				}
+			}
+
+			return bestCompilerPath;
+		}
+
+		HMODULE TryLoadDxCompilerFromPath( const std::filesystem::path& candidate )
+		{
+			std::error_code error;
+			if( !std::filesystem::exists( candidate, error ) || IsBlockedDxCompilerPath( candidate ) )
+			{
+				return nullptr;
+			}
+
+			if( !HasSiblingDxil( candidate ) )
+			{
+				return nullptr;
+			}
+
+			return LoadLibraryExW(
+				candidate.c_str(),
+				nullptr,
+				LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 );
+		}
+
+		HMODULE LoadDxCompilerModule()
+		{
+			const std::filesystem::path executableDirectory = GetExecutableDirectory();
+			const std::filesystem::path currentDirectory = std::filesystem::current_path();
+			const std::filesystem::path sdkCompiler = FindLatestWindowsSdkDxCompiler();
+
+			std::vector<std::filesystem::path> candidates;
+			candidates.reserve( 3 );
+			candidates.push_back( executableDirectory / "dxcompiler.dll" );
+			if( currentDirectory != executableDirectory )
+			{
+				candidates.push_back( currentDirectory / "dxcompiler.dll" );
+			}
+			if( !sdkCompiler.empty() )
+			{
+				candidates.push_back( sdkCompiler );
+			}
+
+			for( const auto& candidate : candidates )
+			{
+				if( HMODULE module = TryLoadDxCompilerFromPath( candidate ); module != nullptr )
+				{
+					return module;
+				}
+			}
+
+			HMODULE module = LoadLibraryExW(
+				L"dxcompiler.dll",
+				nullptr,
+				LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS );
+			if( module != nullptr )
+			{
+				std::array<wchar_t, MAX_PATH> loadedPath{};
+				const DWORD length = GetModuleFileNameW( module, loadedPath.data(), static_cast<DWORD>( loadedPath.size() ) );
+				if( length == 0 )
+				{
+					FreeLibrary( module );
+					return nullptr;
+				}
+
+				const std::filesystem::path loadedModulePath( loadedPath.data(), loadedPath.data() + length );
+				if( IsBlockedDxCompilerPath( loadedModulePath ) || !HasSiblingDxil( loadedModulePath ) )
+				{
+					FreeLibrary( module );
+					return nullptr;
+				}
+			}
+
+			return module;
+		}
+
 		DxcCreateInstanceProc LoadDxcCreateInstance()
 		{
 			static DxcCreateInstanceProc ourCreateInstance = []() -> DxcCreateInstanceProc
 				{
-					const std::array<std::filesystem::path, 4> ourCandidates = {
-						std::filesystem::path( LR"(C:\Program Files\Microsoft PIX\2601.15\dxcompiler.dll)" ),
-						std::filesystem::path( LR"(C:\Program Files\RenderDoc\plugins\d3d12\dxcompiler.dll)" ),
-						std::filesystem::path( LR"(C:\Program Files\BraveSoftware\Brave-Browser\Application\147.1.89.137\dxcompiler.dll)" ),
-						std::filesystem::current_path() / "dxcompiler.dll",
-					};
-
-					for( const auto& candidate : ourCandidates )
+					HMODULE module = LoadDxCompilerModule();
+					if( module == nullptr )
 					{
-						if( !std::filesystem::exists( candidate ) )
-						{
-							continue;
-						}
-
-						HMODULE module = LoadLibraryW( candidate.c_str() );
-						if( module == nullptr )
-						{
-							continue;
-						}
-
-						auto* createInstance = reinterpret_cast<DxcCreateInstanceProc>( GetProcAddress( module, "DxcCreateInstance" ) );
-						if( createInstance != nullptr )
-						{
-							return createInstance;
-						}
+						return nullptr;
 					}
 
-					return nullptr;
+					return reinterpret_cast<DxcCreateInstanceProc>( GetProcAddress( module, "DxcCreateInstance" ) );
 				}();
 
 			if( ourCreateInstance == nullptr )
@@ -178,27 +359,6 @@ namespace lightd3d12
 			if( stage.source == nullptr || profile == nullptr )
 			{
 				throw std::runtime_error( "Shader source or profile is invalid." );
-			}
-
-			if( !IsShaderModel6Profile( profile ) )
-			{
-				CompiledShader compiledShader;
-				ComPtr<ID3DBlob> errors;
-				detail::ThrowIfFailed(
-					D3DCompile(
-						stage.source,
-						std::strlen( stage.source ),
-						nullptr,
-						nullptr,
-						nullptr,
-						stage.entryPoint,
-						profile,
-						0,
-						0,
-						compiledShader.d3dBlob_.GetAddressOf(),
-						errors.GetAddressOf() ),
-					"Failed to compile shader with D3DCompile." );
-				return compiledShader;
 			}
 
 			const auto createInstance = LoadDxcCreateInstance();
@@ -512,8 +672,8 @@ namespace lightd3d12
 			throw std::runtime_error( "RenderPipelineDesc requires valid vertex and fragment shader source." );
 		}
 
-		const CompiledShader vertexShader = CompileShader( desc.vertexShader, "vs_5_1" );
-		const CompiledShader fragmentShader = CompileShader( desc.fragmentShader, "ps_5_1" );
+		const CompiledShader vertexShader = CompileShader( desc.vertexShader, "vs_6_6" );
+		const CompiledShader fragmentShader = CompileShader( desc.fragmentShader, "ps_6_6" );
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
 		psoDesc.pRootSignature = impl.rootSignature_.Get();
@@ -561,7 +721,7 @@ namespace lightd3d12
 			throw std::runtime_error( "ComputePipelineDesc requires a valid compute shader source." );
 		}
 
-		const CompiledShader computeShader = CompileShader( desc.computeShader, "cs_5_1" );
+		const CompiledShader computeShader = CompileShader( desc.computeShader, "cs_6_6" );
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc{};
 		psoDesc.pRootSignature = impl.rootSignature_.Get();
