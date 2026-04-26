@@ -26,6 +26,7 @@ namespace lightd3d12
 		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress_ = 0;
 		uint64_t bufferSize_ = 0;
 		uint32_t bufferStride_ = 0;
+		BufferDesc::BufferType bufferType_ = BufferDesc::BufferType::Generic;
 		D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
 		D3D12_RESOURCE_FLAGS resourceFlags_ = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_DESC desc_ = {};

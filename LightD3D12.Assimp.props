@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
+    <LightD3D12EnableAssimp Condition="'$(LightD3D12EnableAssimp)' == ''">false</LightD3D12EnableAssimp>
+    <LightD3D12AssimpRoot Condition="'$(LightD3D12AssimpRoot)' == ''">$(SolutionDir)third_party\assimp</LightD3D12AssimpRoot>
+    <LightD3D12AssimpIncludeDir Condition="'$(LightD3D12AssimpIncludeDir)' == ''">$(LightD3D12AssimpRoot)\include</LightD3D12AssimpIncludeDir>
+    <LightD3D12AssimpLibDir Condition="'$(LightD3D12AssimpLibDir)' == ''">$(LightD3D12AssimpRoot)\lib</LightD3D12AssimpLibDir>
+    <LightD3D12AssimpBinDir Condition="'$(LightD3D12AssimpBinDir)' == ''">$(LightD3D12AssimpRoot)\bin</LightD3D12AssimpBinDir>
+    <LightD3D12AssimpDebugLibrary Condition="'$(LightD3D12AssimpDebugLibrary)' == ''">assimp-vc143-mtd.lib</LightD3D12AssimpDebugLibrary>
+    <LightD3D12AssimpReleaseLibrary Condition="'$(LightD3D12AssimpReleaseLibrary)' == ''">assimp-vc143-mt.lib</LightD3D12AssimpReleaseLibrary>
+    <LightD3D12AssimpDebugExtraLibraries Condition="'$(LightD3D12AssimpDebugExtraLibraries)' == ''">zlibstaticd.lib</LightD3D12AssimpDebugExtraLibraries>
+    <LightD3D12AssimpReleaseExtraLibraries Condition="'$(LightD3D12AssimpReleaseExtraLibraries)' == ''">zlibstatic.lib</LightD3D12AssimpReleaseExtraLibraries>
+    <LightD3D12AssimpDebugRuntimeDll Condition="'$(LightD3D12AssimpDebugRuntimeDll)' == ''">assimp-vc143-mtd.dll</LightD3D12AssimpDebugRuntimeDll>
+    <LightD3D12AssimpReleaseRuntimeDll Condition="'$(LightD3D12AssimpReleaseRuntimeDll)' == ''">assimp-vc143-mt.dll</LightD3D12AssimpReleaseRuntimeDll>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(LightD3D12EnableAssimp)' == 'true'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(LightD3D12AssimpIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIGHTD3D12_ENABLE_ASSIMP=1;LIGHTD3D12_HAS_ASSIMP=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(LightD3D12AssimpLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies Condition="'$(Configuration)' == 'Debug'">$(LightD3D12AssimpDebugLibrary);$(LightD3D12AssimpDebugExtraLibraries);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(Configuration)' != 'Debug'">$(LightD3D12AssimpReleaseLibrary);$(LightD3D12AssimpReleaseExtraLibraries);%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <Target Name="LightD3D12CopyAssimpRuntime" AfterTargets="Build" Condition="'$(LightD3D12EnableAssimp)' == 'true' and '$(ConfigurationType)' == 'Application'">
+    <Copy SourceFiles="$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpDebugRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'$(Configuration)' == 'Debug' and Exists('$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpDebugRuntimeDll)')" />
+    <Copy SourceFiles="$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpReleaseRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'$(Configuration)' != 'Debug' and Exists('$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpReleaseRuntimeDll)')" />
+  </Target>
+</Project>

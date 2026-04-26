@@ -36,6 +36,7 @@
     <ClInclude Include="src\LightD3D12Swapchain.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\LightD3D12\LightD3D12Imgui.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\LightD3D12Resources.cpp">
@@ -59,5 +60,12 @@
     <ClCompile Include="src\LightD3D12RenderDevice.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\LightD3D12Imgui.cpp" />
+    <ClCompile Include="..\third_party\imgui\imgui.cpp" />
+    <ClCompile Include="..\third_party\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\third_party\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\third_party\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\third_party\imgui\backends\imgui_impl_dx12.cpp" />
+    <ClCompile Include="..\third_party\imgui\backends\imgui_impl_win32.cpp" />
   </ItemGroup>
 </Project>

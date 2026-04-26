@@ -11,7 +11,7 @@
 #if defined( LIGHTD3D12_ENABLE_PIX )
 	#define LIGHTD3D12_INTERNAL_PIX_ENABLED 1
 #else
-	#define LIGHTD3D12_INTERNAL_PIX_ENABLED 0
+	#define LIGHTD3D12_INTERNAL_PIX_ENABLED 1
 #endif
 
 namespace lightd3d12
@@ -529,19 +529,35 @@ namespace lightd3d12
 		wrapper_.commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 	}
 
-	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset )
+	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset, uint32_t slot )
 	{
 		const auto& resource = manager_.GetBufferResource( buffer );
+		if( resource.bufferType_ != BufferDesc::BufferType::VertexBuffer )
+		{
+			throw std::runtime_error( "This buffer was not created as a vertex buffer." );
+		}
 		auto view = resource.GetVertexBufferView( stride );
+		if( offset > view.SizeInBytes )
+		{
+			throw std::runtime_error( "Vertex buffer offset exceeds the buffer size." );
+		}
 		view.BufferLocation += offset;
 		view.SizeInBytes -= offset;
-		wrapper_.commandList_->IASetVertexBuffers( 0, 1, &view );
+		wrapper_.commandList_->IASetVertexBuffers( slot, 1, &view );
 	}
 
 	void CommandBufferImpl::CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format, uint32_t offset )
 	{
 		const auto& resource = manager_.GetBufferResource( buffer );
+		if( resource.bufferType_ != BufferDesc::BufferType::IndexBuffer )
+		{
+			throw std::runtime_error( "This buffer was not created as an index buffer." );
+		}
 		auto view = resource.GetIndexBufferView( format );
+		if( offset > view.SizeInBytes )
+		{
+			throw std::runtime_error( "Index buffer offset exceeds the buffer size." );
+		}
 		view.BufferLocation += offset;
 		view.SizeInBytes -= offset;
 		wrapper_.commandList_->IASetIndexBuffer( &view );
@@ -584,6 +600,11 @@ namespace lightd3d12
 		wrapper_.commandList_->DrawInstanced( vertexCount, instanceCount, firstVertex, firstInstance );
 	}
 
+	void CommandBufferImpl::CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance )
+	{
+		wrapper_.commandList_->DrawIndexedInstanced( indexCount, instanceCount, firstIndex, vertexOffset, firstInstance );
+	}
+
 	void CommandBufferImpl::CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset )
 	{
 		const auto& resource = manager_.GetBufferResource( indirectBuffer );
@@ -599,6 +620,11 @@ namespace lightd3d12
 	void CommandBufferImpl::CmdDispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ )
 	{
 		wrapper_.commandList_->Dispatch( groupCountX, groupCountY, groupCountZ );
+	}
+
+	ID3D12GraphicsCommandList* CommandBufferImpl::GetNativeGraphicsCommandList()
+	{
+		return wrapper_.commandList_.Get();
 	}
 }
 

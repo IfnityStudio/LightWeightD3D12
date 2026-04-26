@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
+    <AmdFsrSdkRoot Condition="'$(AmdFsrSdkRoot)'=='' and Exists('$(SolutionDir)third_party\amd_fsr_sdk\Kits\FidelityFX\api\include\ffx_api.h')">$(SolutionDir)third_party\amd_fsr_sdk\</AmdFsrSdkRoot>
+    <AmdFsrSdkRoot Condition="'$(AmdFsrSdkRoot)'=='' and Exists('$(SolutionDir)third_party\amd_fsr_sdk_repo\Kits\FidelityFX\api\include\ffx_api.h')">$(SolutionDir)third_party\amd_fsr_sdk_repo\</AmdFsrSdkRoot>
+    <AmdFsrSdkRoot Condition="'$(AmdFsrSdkRoot)'==''">$(SolutionDir)third_party\amd_fsr_sdk\</AmdFsrSdkRoot>
+    <AmdFsrSdkApiIncludeDir Condition="'$(AmdFsrSdkApiIncludeDir)'==''">$(AmdFsrSdkRoot)Kits\FidelityFX\api\include\</AmdFsrSdkApiIncludeDir>
+    <AmdFsrSdkUpscalersIncludeDir Condition="'$(AmdFsrSdkUpscalersIncludeDir)'==''">$(AmdFsrSdkRoot)Kits\FidelityFX\upscalers\include\</AmdFsrSdkUpscalersIncludeDir>
+    <AmdFsrSdkLibDir Condition="'$(AmdFsrSdkLibDir)'==''">$(AmdFsrSdkRoot)Kits\FidelityFX\signedbin\</AmdFsrSdkLibDir>
+    <AmdFsrSdkRuntimeDir Condition="'$(AmdFsrSdkRuntimeDir)'==''">$(AmdFsrSdkRoot)Kits\FidelityFX\signedbin\</AmdFsrSdkRuntimeDir>
+    <LightD3D12EnableAmdFsrSdk Condition="'$(LightD3D12EnableAmdFsrSdk)'==''">false</LightD3D12EnableAmdFsrSdk>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(LightD3D12EnableAmdFsrSdk)'=='true' and Exists('$(AmdFsrSdkApiIncludeDir)')">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(AmdFsrSdkApiIncludeDir);$(AmdFsrSdkUpscalersIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIGHTD3D12_HAS_AMD_FSR_SDK=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(LightD3D12EnableAmdFsrSdk)'=='true'">
+    <Link>
+      <AdditionalLibraryDirectories Condition="Exists('$(AmdFsrSdkLibDir)')">$(AmdFsrSdkLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>amd_fidelityfx_loader_dx12.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <Target Name="LightD3D12CopyAmdFsrRuntime" AfterTargets="Build" Condition="'$(LightD3D12EnableAmdFsrSdk)'=='true' and Exists('$(AmdFsrSdkRuntimeDir)')">
+    <ItemGroup>
+      <LightD3D12AmdFsrRuntimeDll Include="$(AmdFsrSdkRuntimeDir)amd_fidelityfx_loader_dx12.dll" Condition="Exists('$(AmdFsrSdkRuntimeDir)amd_fidelityfx_loader_dx12.dll')" />
+      <LightD3D12AmdFsrRuntimeDll Include="$(AmdFsrSdkRuntimeDir)amd_fidelityfx_upscaler_dx12.dll" Condition="Exists('$(AmdFsrSdkRuntimeDir)amd_fidelityfx_upscaler_dx12.dll')" />
+      <LightD3D12AmdFsrRuntimeDll Include="$(AmdFsrSdkRuntimeDir)amd_fidelityfx_framegeneration_dx12.dll" Condition="Exists('$(AmdFsrSdkRuntimeDir)amd_fidelityfx_framegeneration_dx12.dll')" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(LightD3D12AmdFsrRuntimeDll)"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(LightD3D12AmdFsrRuntimeDll)' != ''" />
+  </Target>
+</Project>

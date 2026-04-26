@@ -685,6 +685,28 @@ namespace lightd3d12
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = desc.primitiveType;
 
+		std::vector<D3D12_INPUT_ELEMENT_DESC> nativeInputElements;
+		nativeInputElements.reserve( desc.inputElements.size() );
+		for( const VertexInputElementDesc& inputElement : desc.inputElements )
+		{
+			if( inputElement.semanticName.empty() )
+			{
+				throw std::runtime_error( "RenderPipelineDesc input elements require a semantic name." );
+			}
+
+			D3D12_INPUT_ELEMENT_DESC nativeInputElement{};
+			nativeInputElement.SemanticName = inputElement.semanticName.c_str();
+			nativeInputElement.SemanticIndex = inputElement.semanticIndex;
+			nativeInputElement.Format = inputElement.format;
+			nativeInputElement.InputSlot = inputElement.inputSlot;
+			nativeInputElement.AlignedByteOffset = inputElement.alignedByteOffset;
+			nativeInputElement.InputSlotClass = inputElement.inputClassification;
+			nativeInputElement.InstanceDataStepRate = inputElement.instanceDataStepRate;
+			nativeInputElements.push_back( nativeInputElement );
+		}
+		psoDesc.InputLayout.pInputElementDescs = nativeInputElements.data();
+		psoDesc.InputLayout.NumElements = static_cast<UINT>( nativeInputElements.size() );
+
 		uint32_t numRenderTargets = 0;
 		for( uint32_t index = 0; index < desc.color.size(); ++index )
 		{
@@ -743,6 +765,7 @@ namespace lightd3d12
 		BufferResource resource;
 		resource.bufferSize_ = desc.size;
 		resource.bufferStride_ = desc.stride;
+		resource.bufferType_ = desc.bufferType;
 		resource.resourceFlags_ = desc.flags;
 		resource.heapType_ = desc.heapType;
 		resource.desc_ = BufferResource::BufferDesc( desc.size, desc.flags );
@@ -913,6 +936,16 @@ namespace lightd3d12
 	uint32_t RenderDevice::GetUnorderedAccessIndex( TextureHandle texture ) const
 	{
 		return manager_->impl_->GetTextureResource( texture ).uavIndex_;
+	}
+
+	ID3D12Device* RenderDevice::GetNativeDevice() const noexcept
+	{
+		return manager_->impl_->device_.Get();
+	}
+
+	ID3D12Resource* RenderDevice::GetNativeTextureResource( TextureHandle texture ) const
+	{
+		return manager_->impl_->GetTextureResource( texture ).resource_.Get();
 	}
 
 	bool RenderDevice::BindlessSupported() const noexcept

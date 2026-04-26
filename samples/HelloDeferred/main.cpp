@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <stdexcept>
+#include <string>
 
 using namespace lightd3d12;
 
@@ -130,10 +131,10 @@ PSOutput main(float4 svPosition : SV_Position, float3 encodedPosition : TEXCOORD
 		RenderPipelineDesc desc{};
 		desc.vertexShader.source = ourVertexShader;
 		desc.vertexShader.entryPoint = "main";
-		desc.vertexShader.profile = "vs_5_1";
+		desc.vertexShader.profile = "vs_6_6";
 		desc.fragmentShader.source = ourPixelShader;
 		desc.fragmentShader.entryPoint = "main";
-		desc.fragmentShader.profile = "ps_5_1";
+		desc.fragmentShader.profile = "ps_6_6";
 		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.color[ 1 ].format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		desc.depthFormat = DXGI_FORMAT_UNKNOWN;
@@ -271,9 +272,12 @@ float4 main(float4 svPosition : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
+	AppState app{};
+	HWND hwnd = nullptr;
+	WNDCLASSEXW windowClass{};
+
 	try
 	{
-		WNDCLASSEXW windowClass{};
 		windowClass.cbSize = sizeof( WNDCLASSEX );
 		windowClass.lpfnWndProc = WindowProc;
 		windowClass.hInstance = instance;
@@ -284,7 +288,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		constexpr uint32_t ourInitialWidth = 1400;
 		constexpr uint32_t ourInitialHeight = 900;
 
-		HWND hwnd = CreateWindowExW(
+		hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
 			L"LightD3D12 Hello Deferred",
@@ -306,7 +310,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		ShowWindow( hwnd, showCommand );
 		UpdateWindow( hwnd );
 
-		AppState app{};
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
 
 		ContextDesc contextDesc{};
@@ -436,7 +439,15 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		{
 			app.deviceManager->WaitIdle();
 		}
+
 		app.imguiRenderer.reset();
+		if( app.deviceManager )
+		{
+			if( RenderDevice* renderDevice = app.deviceManager->GetRenderDevice() )
+			{
+				DestroyDeferredTargets( *renderDevice, app.deferredTargets );
+			}
+		}
 		app.pipelineFinal = {};
 		app.pipelineGeometry = {};
 		app.deviceManager.reset();
@@ -449,9 +460,20 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		UnregisterClassW( windowClass.lpszClassName, instance );
 		return 0;
 	}
-	catch( const std::exception& )
+	catch( const std::exception& exception )
 	{
-		MessageBoxA( nullptr, "LightD3D12 HelloDeferred failed.", "LightD3D12", MB_ICONERROR | MB_OK );
+		if( hwnd != nullptr && IsWindow( hwnd ) != FALSE )
+		{
+			SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
+			DestroyWindow( hwnd );
+		}
+		if( windowClass.lpszClassName != nullptr )
+		{
+			UnregisterClassW( windowClass.lpszClassName, instance );
+		}
+
+		const std::string message = std::string( "LightD3D12 HelloDeferred failed:\n" ) + exception.what();
+		MessageBoxA( nullptr, message.c_str(), "LightD3D12", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }

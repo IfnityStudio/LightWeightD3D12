@@ -1,0 +1,208 @@
+@startuml
+title HelloUpscaler Architecture and FSDK Relationship
+
+skinparam monochrome true
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment left
+
+package "Application Layer" {
+  class "HelloUpscaler sample" as Sample {
+    +wWinMain()
+    +WindowProc()
+    +RecreateTargets()
+    +EnsureFsrContext()
+    +UpdateJitter()
+    +DispatchUpscaler()
+  }
+
+  class "AppState" as AppState {
+    +deviceManager
+    +imguiRenderer
+    +scenePipeline
+    +presentPipeline
+    +targets
+    +fsr
+    +ui state
+  }
+
+  class "OffscreenTargets" as Targets {
+    +sceneColor
+    +sceneDepth
+    +motionVectors
+    +upscaledOutput
+    +renderWidth/renderHeight
+    +displayWidth/displayHeight
+  }
+
+  class "FsrState" as FsrState {
+    +ffx::Context
+    +contextFlags
+    +maxRenderSize
+    +maxUpscaleSize
+    +jitterPhaseCount
+    +estimatedMemoryUsageMb
+  }
+}
+
+package "LightD3D12 Layer" {
+  class "DeviceManager" as DeviceManager
+  class "RenderDevice" as RenderDevice {
+    +CreateTexture()
+    +Destroy()
+    +CreateRenderPipeline()
+    +GetNativeDevice()
+    +GetNativeTextureResource()
+  }
+  class "ICommandBuffer" as CommandBuffer {
+    +CmdBeginRendering()
+    +CmdEndRendering()
+    +CmdTransitionTexture()
+    +GetNativeGraphicsCommandList()
+  }
+  class "ImguiRenderer" as ImguiRenderer
+}
+
+package "AMD FSDK Layer" {
+  class "ffx::Query" as FfxQuery
+  class "ffx::CreateContext" as FfxCreate
+  class "ffx::DispatchDescUpscale" as FfxDispatch
+  class "ffx::Context" as FfxContext
+  class "DX12 bridge" as FfxDx12 {
+    +ffxApiGetResourceDX12(...)
+  }
+}
+
+package "GPU Resources" {
+  artifact "sceneColor\nRTV + SRV" as SceneColor
+  artifact "motionVectors\nRTV + SRV" as MotionVectors
+  artifact "sceneDepth\nDSV + SRV" as SceneDepth
+  artifact "upscaledOutput\nUAV + SRV" as UpscaledOutput
+  artifact "swapchain backbuffer\nRTV" as Backbuffer
+}
+
+Sample --> AppState : owns
+AppState --> Targets : owns
+AppState --> FsrState : owns
+AppState --> DeviceManager : owns
+AppState --> ImguiRenderer : owns
+
+DeviceManager --> RenderDevice : provides
+Sample --> RenderDevice : uses through DeviceManager
+Sample --> CommandBuffer : records frame work
+
+RenderDevice --> SceneColor : creates
+RenderDevice --> MotionVectors : creates
+RenderDevice --> SceneDepth : creates
+RenderDevice --> UpscaledOutput : creates
+
+Sample --> FfxQuery : asks for render resolution\nand jitter info
+Sample --> FfxCreate : creates/destroys context
+FfxCreate --> FfxContext : initializes
+FsrState --> FfxContext : stores
+
+Sample --> FfxDx12 : wraps native textures/lists
+RenderDevice --> FfxDx12 : exposes native device/resource
+CommandBuffer --> FfxDx12 : exposes native command list
+
+Sample --> FfxDispatch : fills dispatch inputs
+FfxDispatch --> SceneColor : reads
+FfxDispatch --> MotionVectors : reads
+FfxDispatch --> SceneDepth : reads
+FfxDispatch --> UpscaledOutput : writes
+
+Sample --> Backbuffer : presents final image
+ImguiRenderer --> Backbuffer : overlays UI
+
+note right of Sample
+The sample is the coordinator.
+It does not implement the upscale algorithm itself.
+It prepares resources, gathers camera/frame data,
+and hands everything to AMD FSDK.
+end note
+
+note bottom of Targets
+Logical outputs of the scene pass:
+- sceneColor
+- motionVectors
+- sceneDepth
+
+Logical output of the FSR pass:
+- upscaledOutput
+end note
+
+note right of FfxDispatch
+This is where the relationship with FSDK becomes real.
+The sample converts LightD3D12 resources into DX12 handles,
+fills the FSR dispatch structure,
+and the SDK executes the temporal upscale pass.
+end note
+
+note bottom of Backbuffer
+The swapchain backbuffer is not an FSR input.
+It only receives the final present pass result:
+- sceneColor directly if FSR is disabled
+- upscaledOutput if FSR is enabled
+end note
+
+newpage
+title Frame Flow
+
+start
+
+:Begin frame;
+:Handle window messages and ImGui state;
+:Query display size;
+
+if (FSR enabled?) then (yes)
+  :Query desired internal resolution\nfrom quality mode;
+else (no)
+  :Use display resolution as internal resolution;
+endif
+
+:Recreate targets if resolution changed;
+:Ensure FSR context exists and matches sizes;
+:Query jitter and update projection;
+
+:Scene pass;
+note right
+Writes:
+- sceneColor
+- motionVectors
+- sceneDepth
+end note
+
+if (FSR enabled?) then (yes)
+  :Transition inputs/outputs to FSR states;
+  :Build ffx::DispatchDescUpscale;
+  :Dispatch AMD FSR;
+  note right
+Inputs:
+- sceneColor
+- motionVectors
+- sceneDepth
+- frame timing
+- camera parameters
+- reset flag
+
+Output:
+- upscaledOutput
+end note
+else (no)
+  :Skip FSR dispatch;
+endif
+
+:Present pass;
+note right
+If FSR is disabled:
+- sample sceneColor
+
+If FSR is enabled:
+- sample upscaledOutput
+end note
+
+:ImGui pass overlays UI on backbuffer;
+:Submit command buffer and present swapchain;
+stop
+
+@enduml

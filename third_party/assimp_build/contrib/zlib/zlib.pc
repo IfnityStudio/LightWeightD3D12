@@ -1,0 +1,13 @@
+prefix=C:/LightWeightD3D12/third_party/assimp
+exec_prefix=C:/LightWeightD3D12/third_party/assimp
+libdir=
+sharedlibdir=
+includedir=
+
+Name: zlib
+Description: zlib compression library
+Version: 
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

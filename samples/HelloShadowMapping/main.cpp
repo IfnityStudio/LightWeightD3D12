@@ -1,5 +1,6 @@
 #include "LightD3D12/LightD3D12.hpp"
 #include "LightD3D12/LightD3D12Imgui.hpp"
+#include  "LightD3D12\LightAssimpImporter.hpp"
 
 #include <imgui.h>
 
@@ -12,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <string>
 
 using namespace DirectX;
 using namespace lightd3d12;
@@ -75,6 +77,7 @@ namespace
 		ShadowResources shadow;
 		bool running = true;
 		bool minimized = false;
+		bool assimpEnabled = false;
 		bool pauseAnimation = false;
 		float animationTime = 0.0f;
 		float cubeRotationSpeed = 0.8f;
@@ -591,9 +594,14 @@ float4 main(float4 position : SV_Position) : SV_Target0
 
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
+	AppState app{};
+	HWND hwnd = nullptr;
+	WNDCLASSEXW windowClass{};
+
 	try
 	{
-		WNDCLASSEXW windowClass{};
+
+		app.assimpEnabled = LightAssimpImporter::IsAvailable();
 		windowClass.cbSize = sizeof( WNDCLASSEX );
 		windowClass.lpfnWndProc = WindowProc;
 		windowClass.hInstance = instance;
@@ -604,7 +612,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		constexpr uint32_t kInitialWidth = 1440;
 		constexpr uint32_t kInitialHeight = 900;
 
-		HWND hwnd = CreateWindowExW(
+		hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
 			L"LightD3D12 Hello Shadow Mapping",
@@ -626,7 +634,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		ShowWindow( hwnd, showCommand );
 		UpdateWindow( hwnd );
 
-		AppState app{};
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
 
 		ContextDesc contextDesc{};
@@ -719,6 +726,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				ImGui::Begin( "Hello Shadow Mapping" );
 				ImGui::TextWrapped( "This sample renders a shadow map from the light point of view, previews that depth in ImGui, and then shades the cube and plane in the main pass." );
 				ImGui::Separator();
+				ImGui::Text( "Assimp: %s", app.assimpEnabled ? "enabled" : "disabled" );
 				ImGui::Checkbox( "Pause cube rotation", &app.pauseAnimation );
 				ImGui::SliderFloat( "Cube rotation speed", &app.cubeRotationSpeed, 0.0f, 2.5f, "%.2f" );
 				ImGui::SliderFloat( "Light X", &app.lightX, -8.0f, 8.0f, "%.2f" );
@@ -835,12 +843,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
 		app.deviceManager->WaitIdle();
+		app.imguiRenderer.reset();
 		DestroyDepthTarget( ctx, app.sceneDepth );
 		DestroyShadowResources( ctx, app.shadow );
 		app.shadowPipeline = {};
 		app.scenePipeline = {};
 		app.previewPipeline = {};
-		app.imguiRenderer.reset();
 		app.deviceManager.reset();
 		if( IsWindow( hwnd ) != FALSE )
 		{
@@ -849,9 +857,20 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		UnregisterClassW( windowClass.lpszClassName, instance );
 		return 0;
 	}
-	catch( const std::exception& )
+	catch( const std::exception& exception )
 	{
-		MessageBoxA( nullptr, "LightD3D12 HelloShadowMapping failed.", "LightD3D12", MB_ICONERROR | MB_OK );
+		if( hwnd != nullptr && IsWindow( hwnd ) != FALSE )
+		{
+			SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
+			DestroyWindow( hwnd );
+		}
+		if( windowClass.lpszClassName != nullptr )
+		{
+			UnregisterClassW( windowClass.lpszClassName, instance );
+		}
+
+		const std::string message = std::string( "LightD3D12 HelloShadowMapping failed:\n" ) + exception.what();
+		MessageBoxA( nullptr, message.c_str(), "LightD3D12", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }

@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -166,6 +167,17 @@ namespace lightd3d12
 		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
 	};
 
+	struct VertexInputElementDesc
+	{
+		std::string semanticName;
+		uint32_t semanticIndex = 0;
+		DXGI_FORMAT format = DXGI_FORMAT_R32G32B32_FLOAT;
+		uint32_t inputSlot = 0;
+		uint32_t alignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+		D3D12_INPUT_CLASSIFICATION inputClassification = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+		uint32_t instanceDataStepRate = 0;
+	};
+
 	struct ShaderStageSource
 	{
 		const char* source = nullptr;
@@ -178,6 +190,7 @@ namespace lightd3d12
 		RenderPipelineDesc() noexcept;
 
 		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = {};
+		std::vector<VertexInputElementDesc> inputElements;
 		ShaderStageSource vertexShader = {};
 		ShaderStageSource fragmentShader = {};
 		D3D12_BLEND_DESC blendState = {};
@@ -196,9 +209,17 @@ namespace lightd3d12
 
 	struct BufferDesc
 	{
+		enum class BufferType : uint8_t
+		{
+			Generic,
+			VertexBuffer,
+			IndexBuffer,
+		};
+
 		std::string debugName;
 		uint64_t size = 0;
 		uint32_t stride = 0;
+		BufferType bufferType = BufferType::Generic;
 		D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
@@ -329,14 +350,16 @@ namespace lightd3d12
 		virtual void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) = 0;
 		virtual void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) = 0;
 		virtual void CmdBindComputePipeline( const ComputePipelineState& pipeline ) = 0;
-		virtual void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0 ) = 0;
+		virtual void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0, uint32_t slot = 0 ) = 0;
 		virtual void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 ) = 0;
 		virtual void CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues = 0 ) = 0;
 		virtual void CmdPushDebugGroupLabel( const char* label, uint32_t color ) = 0;
 		virtual void CmdPopDebugGroupLabel() = 0;
 		virtual void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 ) = 0;
+		virtual void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 ) = 0;
 		virtual void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) = 0;
 		virtual void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) = 0;
+		virtual ID3D12GraphicsCommandList* GetNativeGraphicsCommandList() = 0;
 	};
 
 	class ScopedCommandDebugGroup final
@@ -392,6 +415,8 @@ namespace lightd3d12
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
+		ID3D12Device* GetNativeDevice() const noexcept;
+		ID3D12Resource* GetNativeTextureResource( TextureHandle texture ) const;
 		bool BindlessSupported() const noexcept;
 		void WaitIdle();
 		void Destroy( BufferHandle buffer );

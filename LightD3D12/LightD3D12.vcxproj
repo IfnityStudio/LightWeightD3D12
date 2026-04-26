@@ -21,7 +21,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -41,6 +41,8 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <Import Project="$(SolutionDir)LightD3D12.PIX.props" Condition="exists('$(SolutionDir)LightD3D12.PIX.props')" />
+  <Import Project="$(SolutionDir)LightD3D12.FSR.props" Condition="exists('$(SolutionDir)LightD3D12.FSR.props')" />
+  <Import Project="$(SolutionDir)LightD3D12.Assimp.props" Condition="exists('$(SolutionDir)LightD3D12.Assimp.props')" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
@@ -75,7 +77,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\LightD3D12\HandleSlotMap.hpp" />
+    <ClInclude Include="include\LightD3D12\LightAssimpImporter.hpp" />
     <ClInclude Include="include\LightD3D12\LightD3D12.hpp" />
+    <ClInclude Include="include\LightD3D12\LightHLSLLoader.hpp" />
     <ClInclude Include="include\LightD3D12\LightD3D12Imgui.hpp" />
     <ClInclude Include="src\LightD3D12Internal.hpp" />
     <ClInclude Include="src\LightD3D12Resources.hpp" />
@@ -87,6 +91,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\LightD3D12Resources.cpp" />
+    <ClCompile Include="src\LightAssimpImporter.cpp" />
+    <ClCompile Include="src\LightHLSLLoader.cpp" />
     <ClCompile Include="src\LightD3D12ImmediateCommands.cpp" />
     <ClCompile Include="src\LightD3D12CommandBuffer.cpp" />
     <ClCompile Include="src\LightD3D12StagingDevice.cpp" />

@@ -1,0 +1,249 @@
+@startuml
+title HelloUpscaler Integration Guide
+
+skinparam monochrome true
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment left
+
+start
+
+:Goal;
+note right
+Integrate a didactic AMD FSR upscaler sample
+into LightD3D12 as a separate example.
+The sample must show:
+- internal rendering
+- motion vectors
+- depth
+- FSR dispatch
+- final presentation
+- ImGui controls
+end note
+
+:Step 1 - Prepare the solution;
+note right
+Files involved:
+- C:/LightWeightD3D12/LightD3D12.sln
+- C:/LightWeightD3D12/LightD3D12.FSR.props
+- C:/LightWeightD3D12/samples/HelloUpscaler/HelloUpscaler.vcxproj
+
+Reason:
+The sample needs its own project and shared FSR
+build configuration so the SDK can be enabled
+without affecting unrelated samples.
+end note
+
+:Step 2 - Define the external dependency layout;
+note right
+Expected SDK layout:
+- Kits/FidelityFX/api/include
+- Kits/FidelityFX/upscalers/include
+- Kits/FidelityFX/signedbin
+
+Chosen linkage model:
+- import .lib at link time
+- DLLs copied for runtime
+
+Why:
+This matches the current AMD distribution model
+and keeps SDK updates simple.
+end note
+
+:Step 3 - Expose the minimum native DX12 access;
+note right
+LightD3D12 exposes:
+- native ID3D12Device
+- native ID3D12Resource for textures
+- native ID3D12GraphicsCommandList
+
+Why:
+AMD FSR DX12 entry points need real D3D12 objects.
+end note
+
+:Step 4 - Create a dedicated sample;
+note right
+Base idea:
+Use HelloPostProcess as the structural reference.
+
+Why:
+It already demonstrates offscreen rendering,
+resource transitions, compute dispatch,
+and presentation.
+end note
+
+:Step 5 - Add sample state;
+note right
+Main structures added:
+- OffscreenTargets
+- FsrState
+- PresentPushConstants
+- AppState
+
+Responsibilities:
+- own internal render textures
+- own FSR context lifetime
+- store UI state
+- carry current/previous frame data
+end note
+
+:Step 6 - Render the scene at internal resolution;
+note right
+The sample creates:
+- sceneColor
+- sceneDepth
+- motionVectors
+- upscaledOutput
+
+Why:
+Temporal upscalers need more than color.
+They need depth and motion information to
+reproject prior frame history correctly.
+end note
+
+:Step 7 - Add jittered projection;
+note right
+Each frame:
+- query jitter phase count from FSR
+- query jitter offset
+- apply jitter to projection
+
+Why:
+Temporal reconstruction accumulates sub-pixel
+detail over time, so the camera projection must
+be intentionally shifted each frame.
+end note
+
+:Step 8 - Build the scene shaders;
+note right
+Scene vertex shader outputs:
+- current jittered clip position
+- current unjittered clip position
+- previous unjittered clip position
+- motion vector
+
+Scene pixel shader outputs:
+- shaded color
+- motion vector target
+
+Why:
+The upscaler consumes motion vectors and depth
+alongside the current frame color.
+end note
+
+:Step 9 - Create and maintain the FSR context;
+note right
+Lifecycle:
+- compute desired internal resolution from quality mode
+- create context when needed
+- recreate on resize or mode changes
+- destroy cleanly on shutdown
+
+Important inputs:
+- max render size
+- max upscale size
+- FSR flags
+end note
+
+:Step 10 - Dispatch AMD FSR;
+note right
+The dispatch stage maps LightD3D12 resources
+to FSR DX12 resources and supplies:
+- color
+- depth
+- motion vectors
+- output UAV
+- frame delta
+- camera near/far/FOV
+- reset flag
+
+Why:
+This is the actual temporal upscale pass.
+end note
+
+:Step 11 - Present the result;
+note right
+Presentation shader supports:
+- final output
+- split comparison
+- difference heatmap
+- center zoom
+
+ImGui exposes:
+- FSR on/off
+- quality mode
+- sharpening
+- debug view
+- FPS / frame time
+
+Why:
+The sample is didactic, so the user must be able
+to inspect what changes when FSR is enabled.
+end note
+
+:Step 12 - Validate the first working path;
+note right
+Checks performed:
+- compile solution
+- launch sample
+- verify the window stays alive
+- confirm ImGui and FSR path run together
+end note
+
+:Step 13 - Investigate the runtime crash;
+note right
+Observed symptom:
+The app closed shortly after launch.
+
+Initial clue:
+Windows Error Reporting pointed at ProcessMessage,
+but that was not the root cause.
+
+Debug method:
+- collect Application Error event
+- symbolize the offset
+- run under cdb
+end note
+
+:Step 14 - Find the real cause;
+note right
+The first meaningful exception was a shader
+compilation failure during CreatePresentPipeline.
+
+Root cause:
+In the presentation pixel shader, a local variable
+was named "line".
+
+Why it broke:
+In HLSL, "line" is a reserved modifier,
+so the shader failed to compile at startup.
+end note
+
+:Step 15 - Apply the minimal fix;
+note right
+Fix:
+- rename "line" to "gridLine"
+
+Result:
+- shader compiles
+- sample builds
+- executable stays running
+
+Why this matters:
+This was the real blocker preventing startup.
+end note
+
+:Step 16 - Polish the sample for handoff;
+note right
+Final cleanup requested:
+- keep shader text consistent
+- move ImGui messages to English
+- document the whole path in UML
+
+Outcome:
+The sample is easier to explain, maintain,
+and demo.
+end note
+
+stop
+@enduml

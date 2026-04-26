@@ -1,0 +1,65 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Win32-Debug-x64",
+      "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
+      "intelliSenseMode": "windows-msvc-x64",
+      "cppStandard": "c++20",
+      "includePath": [
+        "${workspaceFolder}/LightD3D12/include",
+        "${workspaceFolder}/D3D12",
+        "${workspaceFolder}/third_party/imgui",
+        "${workspaceFolder}/third_party/imgui/backends",
+        "D:/VisualStudioProyects/DirectX12-Framework-/vcpkg/installed/x64-windows/include"
+      ],
+      "defines": [
+        "WIN32_LEAN_AND_MEAN",
+        "NOMINMAX",
+        "UNICODE",
+        "_UNICODE",
+        "_DEBUG"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/LightD3D12/include",
+          "${workspaceFolder}/LightD3D12/src",
+          "${workspaceFolder}/samples",
+          "${workspaceFolder}/third_party/imgui",
+          "D:/VisualStudioProyects/DirectX12-Framework-/vcpkg/installed/x64-windows/include"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    },
+    {
+      "name": "Win32-Release-x64",
+      "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
+      "intelliSenseMode": "windows-msvc-x64",
+      "cppStandard": "c++20",
+      "includePath": [
+        "${workspaceFolder}/LightD3D12/include",
+        "${workspaceFolder}/D3D12",
+        "${workspaceFolder}/third_party/imgui",
+        "${workspaceFolder}/third_party/imgui/backends",
+        "D:/VisualStudioProyects/DirectX12-Framework-/vcpkg/installed/x64-windows/include"
+      ],
+      "defines": [
+        "WIN32_LEAN_AND_MEAN",
+        "NOMINMAX",
+        "UNICODE",
+        "_UNICODE",
+        "NDEBUG"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/LightD3D12/include",
+          "${workspaceFolder}/LightD3D12/src",
+          "${workspaceFolder}/samples",
+          "${workspaceFolder}/third_party/imgui",
+          "D:/VisualStudioProyects/DirectX12-Framework-/vcpkg/installed/x64-windows/include"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ]
+}

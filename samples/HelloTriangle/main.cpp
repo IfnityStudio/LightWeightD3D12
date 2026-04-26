@@ -107,10 +107,10 @@ float4 main(float4 position : SV_Position, float3 color : COLOR0) : SV_Target0
 		RenderPipelineDesc desc{};
 		desc.vertexShader.source = ourVertexShader;
 		desc.vertexShader.entryPoint = "main";
-		desc.vertexShader.profile = "vs_5_1";
+		desc.vertexShader.profile = "vs_6_6";
 		desc.fragmentShader.source = ourPixelShader;
 		desc.fragmentShader.entryPoint = "main";
-		desc.fragmentShader.profile = "ps_5_1";
+		desc.fragmentShader.profile = "ps_6_6";
 		desc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.depthFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthStencilState.DepthEnable = FALSE;
@@ -229,7 +229,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			buffer.CmdPopDebugGroupLabel();
 			if( app.imguiRenderer )
 			{
-				app.imguiRenderer->Render( buffer );
+//				app.imguiRenderer->Render( buffer );
 			}
 			buffer.CmdEndRendering();
 			ctx->Submit( buffer, currentTexture );

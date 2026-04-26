@@ -21,6 +21,7 @@ namespace lightd3d12
 
 	D3D12_VERTEX_BUFFER_VIEW BufferResource::GetVertexBufferView( uint32_t stride ) const noexcept
 	{
+		assert( bufferType_ == BufferDesc::BufferType::VertexBuffer );
 		D3D12_VERTEX_BUFFER_VIEW view{};
 		view.BufferLocation = gpuAddress_;
 		view.SizeInBytes = static_cast<UINT>( bufferSize_ );
@@ -30,6 +31,7 @@ namespace lightd3d12
 
 	D3D12_INDEX_BUFFER_VIEW BufferResource::GetIndexBufferView( DXGI_FORMAT format ) const noexcept
 	{
+		assert( bufferType_ == BufferDesc::BufferType::IndexBuffer );
 		D3D12_INDEX_BUFFER_VIEW view{};
 		view.BufferLocation = gpuAddress_;
 		view.SizeInBytes = static_cast<UINT>( bufferSize_ );

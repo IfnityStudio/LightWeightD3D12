@@ -4,25 +4,39 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12", "LightD3D12\LightD3D12.vcxproj", "{A96F3AFD-6AB4-4DF6-BF2B-D3D31D34F9C9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloTriangle", "samples\HelloTriangle\HelloTriangle.vcxproj", "{7A9F5D97-9C98-46D2-A14C-588C2EC78B11}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloTriangle", "samples\HelloTriangle\HelloTriangle.vcxproj", "{7A9F5D97-9C98-46D2-A14C-588C2EC78B11}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloDeferred", "samples\HelloDeferred\HelloDeferred.vcxproj", "{E74BF741-1E36-4D52-9D7A-23588D7C14BA}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloDeferred", "samples\HelloDeferred\HelloDeferred.vcxproj", "{E74BF741-1E36-4D52-9D7A-23588D7C14BA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloSprites", "samples\HelloSprites\HelloSprites.vcxproj", "{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloSprites", "samples\HelloSprites\HelloSprites.vcxproj", "{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloCube", "samples\HelloCube\HelloCube.vcxproj", "{6C8D222D-C988-4AD5-89EC-14C621AABB6B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloCube", "samples\HelloCube\HelloCube.vcxproj", "{6C8D222D-C988-4AD5-89EC-14C621AABB6B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloInstancing", "samples\HelloInstancing\HelloInstancing.vcxproj", "{1EB3F251-2C0C-4A35-A104-A0AF4E6F33E3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloInstancing", "samples\HelloInstancing\HelloInstancing.vcxproj", "{1EB3F251-2C0C-4A35-A104-A0AF4E6F33E3}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloRenderToTexture", "samples\HelloRenderToTexture\HelloRenderToTexture.vcxproj", "{53E16067-EA43-420F-A80B-EF31F6CFD1C2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloRenderToTexture", "samples\HelloRenderToTexture\HelloRenderToTexture.vcxproj", "{53E16067-EA43-420F-A80B-EF31F6CFD1C2}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloCompute", "samples\HelloCompute\HelloCompute.vcxproj", "{9A0D4B1F-23B9-4A52-8822-BB5F1A6313D7}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloCompute", "samples\HelloCompute\HelloCompute.vcxproj", "{9A0D4B1F-23B9-4A52-8822-BB5F1A6313D7}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloShadowMapping", "samples\HelloShadowMapping\HelloShadowMapping.vcxproj", "{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloShadowMapping", "samples\HelloShadowMapping\HelloShadowMapping.vcxproj", "{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12HelloPostProcess", "samples\HelloPostProcess\HelloPostProcess.vcxproj", "{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoDepthStencl", "samples\DemoDepthStencl\DemoDepthStencl.vcxproj", "{50BBA61F-12AD-4DBA-A25D-F018015CCBFB}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloPostProcess", "samples\HelloPostProcess\HelloPostProcess.vcxproj", "{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloUpscaler", "samples\HelloUpscaler\HelloUpscaler.vcxproj", "{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloNightVision", "samples\HelloNightVision\HelloNightVision.vcxproj", "{8C1D7E96-0039-4D31-B19A-53737AB4B24A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MiniEngine2D", "samples\MiniEngine2D\MiniEngine2D.vcxproj", "{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloAssimpDuck", "samples\HelloAssimpDuck\HelloAssimpDuck.vcxproj", "{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FSR Integration", "FSR Integration", "{A681F480-6086-4914-A6D1-A4161674D33E}"
+	ProjectSection(SolutionItems) = preProject
+		LightD3D12.FSR.props = LightD3D12.FSR.props
+		third_party\amd_fsr_sdk\README.md = third_party\amd_fsr_sdk\README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -66,14 +80,30 @@ Global
 		{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}.Debug|x64.Build.0 = Debug|x64
 		{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}.Release|x64.ActiveCfg = Release|x64
 		{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}.Release|x64.Build.0 = Release|x64
+		{50BBA61F-12AD-4DBA-A25D-F018015CCBFB}.Debug|x64.ActiveCfg = Debug|x64
+		{50BBA61F-12AD-4DBA-A25D-F018015CCBFB}.Debug|x64.Build.0 = Debug|x64
+		{50BBA61F-12AD-4DBA-A25D-F018015CCBFB}.Release|x64.ActiveCfg = Release|x64
+		{50BBA61F-12AD-4DBA-A25D-F018015CCBFB}.Release|x64.Build.0 = Release|x64
 		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Debug|x64.ActiveCfg = Debug|x64
 		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Debug|x64.Build.0 = Debug|x64
 		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Release|x64.ActiveCfg = Release|x64
 		{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}.Release|x64.Build.0 = Release|x64
+		{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}.Debug|x64.ActiveCfg = Debug|x64
+		{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}.Debug|x64.Build.0 = Debug|x64
+		{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}.Release|x64.ActiveCfg = Release|x64
+		{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}.Release|x64.Build.0 = Release|x64
+		{8C1D7E96-0039-4D31-B19A-53737AB4B24A}.Debug|x64.ActiveCfg = Debug|x64
+		{8C1D7E96-0039-4D31-B19A-53737AB4B24A}.Debug|x64.Build.0 = Debug|x64
+		{8C1D7E96-0039-4D31-B19A-53737AB4B24A}.Release|x64.ActiveCfg = Release|x64
+		{8C1D7E96-0039-4D31-B19A-53737AB4B24A}.Release|x64.Build.0 = Release|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Debug|x64.ActiveCfg = Debug|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Debug|x64.Build.0 = Debug|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Release|x64.ActiveCfg = Release|x64
 		{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}.Release|x64.Build.0 = Release|x64
+		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Debug|x64.ActiveCfg = Debug|x64
+		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Debug|x64.Build.0 = Debug|x64
+		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Release|x64.ActiveCfg = Release|x64
+		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
