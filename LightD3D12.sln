@@ -32,6 +32,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MiniEngine2D", "samples\Min
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloAssimpDuck", "samples\HelloAssimpDuck\HelloAssimpDuck.vcxproj", "{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloMeshDeformation", "samples\HelloMeshDeformation\HelloMeshDeformation.vcxproj", "{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloVolumetricClouds", "samples\HelloVolumetricClouds\HelloVolumetricClouds.vcxproj", "{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FSR Integration", "FSR Integration", "{A681F480-6086-4914-A6D1-A4161674D33E}"
 	ProjectSection(SolutionItems) = preProject
 		LightD3D12.FSR.props = LightD3D12.FSR.props
@@ -104,6 +108,14 @@ Global
 		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Debug|x64.Build.0 = Debug|x64
 		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Release|x64.ActiveCfg = Release|x64
 		{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}.Release|x64.Build.0 = Release|x64
+		{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}.Debug|x64.ActiveCfg = Debug|x64
+		{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}.Debug|x64.Build.0 = Debug|x64
+		{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}.Release|x64.ActiveCfg = Release|x64
+		{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}.Release|x64.Build.0 = Release|x64
+		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Debug|x64.ActiveCfg = Debug|x64
+		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Debug|x64.Build.0 = Debug|x64
+		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Release|x64.ActiveCfg = Release|x64
+		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

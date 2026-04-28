@@ -259,6 +259,12 @@ namespace lightd3d12
 		return ( usage & bit ) != TextureUsage::None;
 	}
 
+	enum class TextureDimension : uint8_t
+	{
+		Texture2D,
+		Texture3D,
+	};
+
 	struct TextureDesc
 	{
 		std::string debugName;
@@ -266,6 +272,7 @@ namespace lightd3d12
 		uint32_t height = 1;
 		uint16_t mipLevels = 1;
 		uint16_t depthOrArraySize = 1;
+		TextureDimension dimension = TextureDimension::Texture2D;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		TextureUsage usage = TextureUsage::Sampled;
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;

@@ -86,6 +86,8 @@ namespace lightd3d12
 		uint32_t uavIndex_ = UINT32_MAX;
 		uint32_t width_ = 0;
 		uint32_t height_ = 0;
+		uint16_t depthOrArraySize_ = 1;
+		TextureDimension dimension_ = TextureDimension::Texture2D;
 		bool isDepthFormat_ = false;
 		bool isStencilFormat_ = false;
 		bool isSwapchainImage_ = false;

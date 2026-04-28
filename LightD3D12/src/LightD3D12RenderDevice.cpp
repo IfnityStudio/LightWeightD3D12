@@ -834,9 +834,29 @@ namespace lightd3d12
 			throw std::runtime_error( "DepthStencil textures cannot expose UAVs." );
 		}
 
+		if( desc.dimension == TextureDimension::Texture3D )
+		{
+			if( desc.depthOrArraySize <= 1 )
+			{
+				throw std::runtime_error( "Texture3D resources require depthOrArraySize > 1." );
+			}
+
+			if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) || HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
+			{
+				throw std::runtime_error( "This lightweight API currently supports Texture3D only for SRV/UAV usage." );
+			}
+
+			if( desc.data != nullptr )
+			{
+				throw std::runtime_error( "Texture3D CPU uploads are not implemented yet. Populate them with compute or add a staging path." );
+			}
+		}
+
 		TextureResource resource;
 		resource.width_ = desc.width;
 		resource.height_ = desc.height;
+		resource.depthOrArraySize_ = desc.depthOrArraySize;
+		resource.dimension_ = desc.dimension;
 		resource.format_ = desc.format;
 		resource.formats_ = ResolveTextureFormats( desc );
 		resource.usageFlags_ = ResolveTextureResourceFlags( desc.usage );
@@ -844,15 +864,28 @@ namespace lightd3d12
 		resource.isDepthFormat_ = TextureResource::IsDepthFormat( resource.formats_.dsv_ );
 		resource.isStencilFormat_ = TextureResource::IsDepthStencilFormat( resource.formats_.dsv_ );
 
-		resource.desc_ = CD3DX12_RESOURCE_DESC::Tex2D(
-			resource.formats_.resource_,
-			desc.width,
-			desc.height,
-			desc.depthOrArraySize,
-			desc.mipLevels,
-			1,
-			0,
-			resource.usageFlags_ );
+		if( desc.dimension == TextureDimension::Texture3D )
+		{
+			resource.desc_ = CD3DX12_RESOURCE_DESC::Tex3D(
+				resource.formats_.resource_,
+				desc.width,
+				desc.height,
+				desc.depthOrArraySize,
+				desc.mipLevels,
+				resource.usageFlags_ );
+		}
+		else
+		{
+			resource.desc_ = CD3DX12_RESOURCE_DESC::Tex2D(
+				resource.formats_.resource_,
+				desc.width,
+				desc.height,
+				desc.depthOrArraySize,
+				desc.mipLevels,
+				1,
+				0,
+				resource.usageFlags_ );
+		}
 
 		const auto heapProps = CD3DX12_HEAP_PROPERTIES( D3D12_HEAP_TYPE_DEFAULT );
 		const D3D12_CLEAR_VALUE* clearValue = desc.useClearValue ? &desc.clearValue : nullptr;
@@ -875,8 +908,16 @@ namespace lightd3d12
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			srvDesc.Format = resource.formats_.srv_;
-			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			srvDesc.Texture2D.MipLevels = desc.mipLevels;
+			if( desc.dimension == TextureDimension::Texture3D )
+			{
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+				srvDesc.Texture3D.MipLevels = desc.mipLevels;
+			}
+			else
+			{
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				srvDesc.Texture2D.MipLevels = desc.mipLevels;
+			}
 			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
 		}
 
@@ -888,7 +929,11 @@ namespace lightd3d12
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
 			uavDesc.Format = resource.formats_.uav_;
-			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			uavDesc.ViewDimension = desc.dimension == TextureDimension::Texture3D ? D3D12_UAV_DIMENSION_TEXTURE3D : D3D12_UAV_DIMENSION_TEXTURE2D;
+			if( desc.dimension == TextureDimension::Texture3D )
+			{
+				uavDesc.Texture3D.WSize = desc.depthOrArraySize;
+			}
 			impl.device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr, &uavDesc, resource.uavHandle_ );
 		}
 
