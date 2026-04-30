@@ -146,7 +146,14 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/Cube/main.cpp"
     )
 
+    ourAddSample(
+        LightD3D12GlobeMap
+        "${ourLightD3D12Root}/samples/GlobeMap/main.cpp"
+        "${ourLightD3D12Root}/samples/GlobeMap/map.png"
+    )
+
     target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
+    target_link_libraries(LightD3D12GlobeMap PRIVATE windowscodecs ole32)
 
     set_property(DIRECTORY "${ourLightD3D12Root}" PROPERTY VS_STARTUP_PROJECT LightD3D12Triangle)
 endif()
@@ -166,5 +173,7 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/Sprites/main.cpp"
         "${ourLightD3D12Root}/samples/Sprites/enemy.png"
         "${ourLightD3D12Root}/samples/Cube/main.cpp"
+        "${ourLightD3D12Root}/samples/GlobeMap/main.cpp"
+        "${ourLightD3D12Root}/samples/GlobeMap/map.png"
     )
 endif()

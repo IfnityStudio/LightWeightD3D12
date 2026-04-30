@@ -36,6 +36,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MeshDeformation", "samples\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VolumetricClouds", "samples\VolumetricClouds\VolumetricClouds.vcxproj", "{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GlobeMap", "samples\GlobeMap\GlobeMap.vcxproj", "{790E12DA-28C7-4B46-BED2-945A2C4EEDF7}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12WpfNative", "bindings\LightD3D12WpfNative\LightD3D12WpfNative.vcxproj", "{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WpfTriangle", "samples\WpfTriangle\WpfTriangle.csproj", "{58BA7B56-4211-4C1E-A01F-00501854660B}"
@@ -123,6 +125,10 @@ Global
 		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Debug|x64.Build.0 = Debug|x64
 		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Release|x64.ActiveCfg = Release|x64
 		{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}.Release|x64.Build.0 = Release|x64
+		{790E12DA-28C7-4B46-BED2-945A2C4EEDF7}.Debug|x64.ActiveCfg = Debug|x64
+		{790E12DA-28C7-4B46-BED2-945A2C4EEDF7}.Debug|x64.Build.0 = Debug|x64
+		{790E12DA-28C7-4B46-BED2-945A2C4EEDF7}.Release|x64.ActiveCfg = Release|x64
+		{790E12DA-28C7-4B46-BED2-945A2C4EEDF7}.Release|x64.Build.0 = Release|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.ActiveCfg = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.Build.0 = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Release|x64.ActiveCfg = Release|x64
