@@ -4,41 +4,41 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12", "LightD3D12\LightD3D12.vcxproj", "{A96F3AFD-6AB4-4DF6-BF2B-D3D31D34F9C9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloTriangle", "samples\HelloTriangle\HelloTriangle.vcxproj", "{7A9F5D97-9C98-46D2-A14C-588C2EC78B11}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Triangle", "samples\Triangle\Triangle.vcxproj", "{7A9F5D97-9C98-46D2-A14C-588C2EC78B11}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloDeferred", "samples\HelloDeferred\HelloDeferred.vcxproj", "{E74BF741-1E36-4D52-9D7A-23588D7C14BA}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Deferred", "samples\Deferred\Deferred.vcxproj", "{E74BF741-1E36-4D52-9D7A-23588D7C14BA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloSprites", "samples\HelloSprites\HelloSprites.vcxproj", "{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Sprites", "samples\Sprites\Sprites.vcxproj", "{61F7A77F-9F9D-46DD-9D22-525B33CC4C51}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloCube", "samples\HelloCube\HelloCube.vcxproj", "{6C8D222D-C988-4AD5-89EC-14C621AABB6B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Cube", "samples\Cube\Cube.vcxproj", "{6C8D222D-C988-4AD5-89EC-14C621AABB6B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloInstancing", "samples\HelloInstancing\HelloInstancing.vcxproj", "{1EB3F251-2C0C-4A35-A104-A0AF4E6F33E3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Instancing", "samples\Instancing\Instancing.vcxproj", "{1EB3F251-2C0C-4A35-A104-A0AF4E6F33E3}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloRenderToTexture", "samples\HelloRenderToTexture\HelloRenderToTexture.vcxproj", "{53E16067-EA43-420F-A80B-EF31F6CFD1C2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderToTexture", "samples\RenderToTexture\RenderToTexture.vcxproj", "{53E16067-EA43-420F-A80B-EF31F6CFD1C2}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloCompute", "samples\HelloCompute\HelloCompute.vcxproj", "{9A0D4B1F-23B9-4A52-8822-BB5F1A6313D7}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Compute", "samples\Compute\Compute.vcxproj", "{9A0D4B1F-23B9-4A52-8822-BB5F1A6313D7}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloShadowMapping", "samples\HelloShadowMapping\HelloShadowMapping.vcxproj", "{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShadowMapping", "samples\ShadowMapping\ShadowMapping.vcxproj", "{82E8C4C4-BEB3-4F14-869B-43A6B858A4D0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DemoDepthStencl", "samples\DemoDepthStencl\DemoDepthStencl.vcxproj", "{50BBA61F-12AD-4DBA-A25D-F018015CCBFB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloPostProcess", "samples\HelloPostProcess\HelloPostProcess.vcxproj", "{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PostProcess", "samples\PostProcess\PostProcess.vcxproj", "{4D7B7214-7B82-4B2F-9EC9-661C3B0948F1}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloUpscaler", "samples\HelloUpscaler\HelloUpscaler.vcxproj", "{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Upscaler", "samples\Upscaler\Upscaler.vcxproj", "{F60C8D0C-6A8A-4C1A-A854-3C96FB5C6711}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloNightVision", "samples\HelloNightVision\HelloNightVision.vcxproj", "{8C1D7E96-0039-4D31-B19A-53737AB4B24A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NightVision", "samples\NightVision\NightVision.vcxproj", "{8C1D7E96-0039-4D31-B19A-53737AB4B24A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MiniEngine2D", "samples\MiniEngine2D\MiniEngine2D.vcxproj", "{5F2F0DB5-719D-4B4D-A6A3-963A5A78A4C1}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloAssimpDuck", "samples\HelloAssimpDuck\HelloAssimpDuck.vcxproj", "{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AssimpDuck", "samples\AssimpDuck\AssimpDuck.vcxproj", "{00C71C63-3F5C-43A4-B1E2-A4D179DC148A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloMeshDeformation", "samples\HelloMeshDeformation\HelloMeshDeformation.vcxproj", "{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MeshDeformation", "samples\MeshDeformation\MeshDeformation.vcxproj", "{6BFD8CA7-41E1-44A7-AC64-9EC7EF1D37B2}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloVolumetricClouds", "samples\HelloVolumetricClouds\HelloVolumetricClouds.vcxproj", "{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VolumetricClouds", "samples\VolumetricClouds\VolumetricClouds.vcxproj", "{91E1C3D4-3A36-4726-8E15-8D87A750A4D5}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12WpfNative", "bindings\LightD3D12WpfNative\LightD3D12WpfNative.vcxproj", "{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HelloWpfTriangle", "samples\HelloWpfTriangle\HelloWpfTriangle.csproj", "{58BA7B56-4211-4C1E-A01F-00501854660B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WpfTriangle", "samples\WpfTriangle\WpfTriangle.csproj", "{58BA7B56-4211-4C1E-A01F-00501854660B}"
 	ProjectSection(ProjectDependencies) = postProject
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B} = {0A7278F8-D4CC-4E17-A25D-A97D94FA104B}
 	EndProjectSection

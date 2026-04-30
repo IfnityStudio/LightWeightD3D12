@@ -1,0 +1,697 @@
+# VolumetricClouds
+
+This sample ports the main idea of the OpenGL repository `diharaw/volumetric-clouds` to the current `LightD3D12` DX12 framework.
+
+The original repository does **not** render clouds with visible cubes or voxels.  
+Instead, it follows this approach:
+
+1. Generate 3D noise volumes on the GPU.
+2. Render a simple scene.
+3. Ray march a cloud layer in a fullscreen pass.
+4. Use density, Beer-Lambert transmittance, and cone sampling toward the sun to light the clouds.
+
+This sample follows the same rendering idea, but keeps the implementation compact enough to fit the current engine.
+
+---
+
+## 1. What This Sample Renders
+
+The final image is built in two main stages:
+
+1. A **ground pass** draws a large plane imported from the reference repository.
+2. A **cloud pass** ray marches a spherical cloud layer over that scene.
+
+That means the sample does **not** create cloud geometry.  
+The clouds are volumetric and live inside the pixel shader.
+
+---
+
+## 2. Files That Matter
+
+### Sample entry point
+
+- `samples/VolumetricClouds/main.cpp`
+
+This file creates the window, the device, the depth target, the imported ground plane, the 3D noise textures, and the two render passes.
+
+### Ground shaders
+
+- `samples/VolumetricClouds/shaders/VolumetricCloudsGroundVS.hlsl`
+- `samples/VolumetricClouds/shaders/VolumetricCloudsGroundPS.hlsl`
+
+These shaders render the imported plane from the original repo.
+
+### Cloud shaders
+
+- `samples/VolumetricClouds/shaders/VolumetricCloudsVS.hlsl`
+- `samples/VolumetricClouds/shaders/VolumetricCloudsPS.hlsl`
+
+The vertex shader draws a fullscreen triangle.  
+The pixel shader performs the volumetric cloud ray march.
+
+### Noise generation shaders
+
+- `samples/VolumetricClouds/shaders/VolumetricCloudsShapeNoiseCS.hlsl`
+- `samples/VolumetricClouds/shaders/VolumetricCloudsDetailNoiseCS.hlsl`
+
+These compute shaders generate the 3D textures that define cloud structure.
+
+### Imported asset from the reference repo
+
+- `Data/volumetric_clouds/plane.obj`
+- `Data/volumetric_clouds/plane.mtl`
+
+These files were copied from the upstream OpenGL repository.  
+They are used only as a simple ground plane to give the clouds a horizon and scene context.
+
+---
+
+## 3. Why The Ground Plane Exists
+
+Earlier cloud attempts looked detached because there was no world reference behind them.
+
+The upstream repo only ships one `.obj`: a plane.  
+That plane is now used as:
+
+- a simple terrain proxy
+- a horizon reference
+- a visual anchor that helps the cloud layer feel suspended above a scene
+
+The ground plane is loaded in:
+
+- `CreateGroundPlaneModel(...)`
+
+and rendered in:
+
+- `VolumetricClouds::GroundPass`
+
+---
+
+## 4. High-Level Frame Flow
+
+Every frame does this:
+
+1. Update animation time and camera orbit.
+2. Build `ImGui`.
+3. Generate the 3D noise textures if needed.
+4. Render the imported plane into the swapchain plus depth.
+5. Render the volumetric clouds on top with alpha blending.
+6. Render `ImGui`.
+7. Present.
+
+In short:
+
+`Noise generation -> Ground pass -> Cloud raymarch pass -> ImGui -> Present`
+
+---
+
+## 5. GPU Resources Used
+
+### 3D textures
+
+Two 3D textures are created:
+
+- `shape noise`
+- `detail noise`
+
+They are created in:
+
+- `CreateNoiseTexture(...)`
+
+Each one is a real DX12 3D texture:
+
+- `shape noise`: `64 x 64 x 64`
+- `detail noise`: `32 x 32 x 32`
+
+The sample uses them as:
+
+- `SRV` when sampling in the cloud pixel shader
+- `UAV` when filling them in the compute passes
+
+### Depth texture
+
+A depth target is created for the ground pass:
+
+- `RecreateDepthTarget(...)`
+
+This is used only by the ground scene, not by the cloud shader.
+
+### Ground buffers
+
+The imported plane is converted into:
+
+- a vertex buffer
+- an index buffer
+
+That conversion happens in:
+
+- `CreateGroundPlaneModel(...)`
+
+---
+
+## 6. Why The Engine Needed 3D Texture Support
+
+The original engine only handled 2D textures in the generic `CreateTexture(...)` path.
+
+To support volumetric clouds, minimal 3D texture support was added in:
+
+- `LightD3D12/include/LightD3D12/LightD3D12.hpp`
+- `LightD3D12/src/LightD3D12Resources.hpp`
+- `LightD3D12/src/LightD3D12RenderDevice.cpp`
+
+What changed:
+
+1. A new `TextureDimension` enum was added.
+2. `TextureDesc` now stores whether the texture is `Texture2D` or `Texture3D`.
+3. `CreateTexture(...)` now creates:
+   - `Tex2D(...)` for normal textures
+   - `Tex3D(...)` for volume textures
+4. SRV/UAV descriptor creation now uses:
+   - `D3D12_SRV_DIMENSION_TEXTURE3D`
+   - `D3D12_UAV_DIMENSION_TEXTURE3D`
+
+Current limitation:
+
+- This lightweight implementation supports 3D textures only for `SRV/UAV` use cases.
+- CPU upload for 3D textures is intentionally not implemented here.
+- The sample fills them through compute shaders instead.
+
+That keeps the API small and enough for this cloud renderer.
+
+---
+
+## 7. How The 3D Noise Is Built
+
+The cloud system uses two different noise volumes.
+
+### Shape noise
+
+Generated by:
+
+- `VolumetricCloudsShapeNoiseCS.hlsl`
+
+Purpose:
+
+- define the large-scale silhouette of the cloud masses
+- create the broad “where the cloud exists” structure
+
+This shader produces a compact approximation of a **Perlin-Worley-style** texture:
+
+- billowy FBM built from value noise
+- several Worley octaves
+- a remap that blends the base noise with cellular structure
+
+Output channels:
+
+- `R`: base blended cloud density driver
+- `G/B/A`: extra Worley octaves used later as FBM support
+
+### Detail noise
+
+Generated by:
+
+- `VolumetricCloudsDetailNoiseCS.hlsl`
+
+Purpose:
+
+- erode the base cloud shape
+- add smaller breakup
+- stop the cloud from looking like a smooth blob
+
+This shader stores several higher-frequency Worley octaves.
+
+---
+
+## 8. Why Two Noise Volumes
+
+Using only one volume usually gives you one of these problems:
+
+- too soft and blobby
+- too noisy everywhere
+- no readable main shapes
+
+So the cloud density is built in two stages:
+
+1. **Shape stage**
+   - decides the big cloud body
+2. **Detail stage**
+   - carves and erodes the body
+
+This is the same design logic used by the OpenGL reference.
+
+---
+
+## 9. Ground Pass
+
+The ground pass uses a normal mesh pipeline.
+
+### CPU side
+
+The sample loads the plane with Assimp:
+
+- `CreateGroundPlaneModel(...)`
+
+Then creates:
+
+- `vertex buffer`
+- `index buffer`
+
+### GPU side
+
+The ground pipeline is created in:
+
+- `CreateGroundPipeline(...)`
+
+The pass itself is recorded in:
+
+- `VolumetricClouds::GroundPass`
+
+### Ground shading
+
+The ground shader is intentionally simple:
+
+- basic directional light
+- slight checker variation using UVs
+- distance fade toward the horizon
+
+That is enough to avoid a flat empty background without making the sample about terrain rendering.
+
+---
+
+## 10. Cloud Pass
+
+The cloud pass is a fullscreen pass.
+
+### Vertex shader
+
+- `VolumetricCloudsVS.hlsl`
+
+This draws one fullscreen triangle.
+
+Why a fullscreen triangle:
+
+- fewer vertices than a quad
+- no diagonal seam
+- common postprocess pattern
+
+### Pixel shader
+
+- `VolumetricCloudsPS.hlsl`
+
+This is where the actual volumetric rendering happens.
+
+---
+
+## 11. Camera Ray Reconstruction
+
+For each pixel, the shader reconstructs a view ray using:
+
+- `gInvViewProjection`
+
+This happens in:
+
+- `GenerateViewRay(...)`
+
+The flow is:
+
+1. Convert screen UV from `[0,1]` to clip space `[-1,1]`.
+2. Multiply by inverse view-projection.
+3. Divide by `w`.
+4. Normalize the direction from camera to reconstructed world point.
+
+This gives a world-space ray per pixel.
+
+That is the starting point for the volumetric ray march.
+
+---
+
+## 12. Cloud Layer Shape
+
+The clouds are not inside a box.
+
+They live in a **spherical shell**:
+
+- inner radius = `planetRadius + cloudMinHeight`
+- outer radius = `planetRadius + cloudMaxHeight`
+
+This follows the same idea as the reference repo.
+
+Why a spherical shell:
+
+- cloud layers over long distances should curve with the planet
+- horizon behavior looks more natural
+- it avoids the “flat infinite fog slab” look
+
+The pixel shader computes entry/exit distances against this shell in:
+
+- `BuildCloudSegment(...)`
+
+---
+
+## 13. Density Evaluation
+
+The main density function is:
+
+- `SampleCloudDensity(...)`
+
+This function does the following:
+
+1. Offsets the sample point by wind and vertical shear.
+2. Samples the low-frequency `shape noise`.
+3. Builds a low-frequency FBM from the noise channels.
+4. Creates the base cloud body.
+5. Applies a height gradient so the cloud has a bottom and top profile.
+6. Applies cloud coverage.
+7. Optionally samples the high-frequency `detail noise`.
+8. Uses the detail noise to erode the cloud shape.
+
+The output is a density value in `[0, 1]`.
+
+This is the heart of the cloud appearance.
+
+---
+
+## 14. Why Coverage Is Not Just “Opacity”
+
+`cloudCoverage` is not simply a final alpha multiplier.
+
+Instead, it changes:
+
+- how much of the base cloud field survives thresholding
+- how easily empty space turns into cloud mass
+
+That means it changes cloud formation, not just brightness.
+
+This makes the control much more useful artistically.
+
+---
+
+## 15. Height Gradient
+
+Clouds should not have identical density from base to top.
+
+This sample uses:
+
+- `HeightFractionForPoint(...)`
+- `DensityHeightGradient(...)`
+
+The purpose is:
+
+- softer start near the bottom
+- reduced density near the top
+- a more cumulus-like vertical profile
+
+Without a height gradient, the clouds feel more like random smoke than a sky layer.
+
+---
+
+## 16. Lighting The Clouds
+
+The cloud lighting is simplified but follows the same volumetric logic as the OpenGL sample.
+
+Key functions:
+
+- `SampleCloudDensityAlongCone(...)`
+- `BeerLambert(...)`
+- `BeerPowder(...)`
+- `HenyeyGreensteinPhase(...)`
+- `CalculateLightEnergy(...)`
+
+### Cone sampling
+
+For each cloud sample, the shader looks toward the sun and accumulates density along a small cone.
+
+Why a cone:
+
+- one single shadow ray can look too hard and noisy
+- several offset samples create softer self-shadowing
+
+### Beer-Lambert
+
+This models how light is attenuated through the medium.
+
+In practice:
+
+- more density = less transmitted light
+
+### Phase function
+
+The Henyey-Greenstein term controls directional scattering.
+
+This helps the clouds respond differently depending on view direction versus sun direction.
+
+That is one of the reasons a volumetric cloud can feel “lit from within”.
+
+---
+
+## 17. Ray Marching Loop
+
+The main march happens in:
+
+- `RayMarchClouds(...)`
+
+For every pixel:
+
+1. Find the cloud segment in world space.
+2. Decide how many steps to use.
+3. Jitter the start position slightly.
+4. March forward through the volume.
+5. Sample density at each step.
+6. If density is present:
+   - estimate light from the sun
+   - update accumulated scattering
+   - update accumulated transmittance
+7. Stop early if transmittance becomes very low.
+
+This is the core volumetric integration step.
+
+---
+
+## 18. Why Jitter Is Used
+
+The shader uses:
+
+- `InterleavedGradientNoise(...)`
+
+Purpose:
+
+- shift the ray start a little per pixel
+- reduce visible marching bands
+
+Without this, evenly spaced samples can produce obvious striping.
+
+This sample uses a compact procedural version instead of a blue-noise texture.
+
+---
+
+## 19. Why The Clouds Are Alpha Blended
+
+The cloud pass is drawn **after** the ground pass with blending enabled.
+
+That lets the ground remain visible while the cloud shader contributes only where the sky should be affected.
+
+The output alpha is driven by:
+
+- `horizonBlend`
+
+This is an intentional simplification.
+
+What it does:
+
+- near the lower viewing angles, the cloud pass fades out
+- near the sky, the cloud pass becomes fully active
+
+Why:
+
+- the sample does not yet read back scene depth into the cloud shader
+- fading by view direction avoids painting clouds heavily over the ground plane everywhere
+
+This is a practical compromise for a didactic sample.
+
+---
+
+## 20. What Is Simplified Compared To The Original Repo
+
+This sample is inspired by the original repo, but not all features are copied exactly.
+
+Main simplifications:
+
+1. No external blue-noise texture.
+   - replaced by procedural interleaved gradient noise
+
+2. No curl noise texture.
+   - replaced by a smaller procedural turbulence distortion
+
+3. No full atmospheric scattering pipeline.
+   - replaced by a procedural sky color function
+
+4. No scene depth composition inside the cloud shader.
+   - the pass uses a horizon-based alpha fade instead
+
+5. No temporal reprojection or history accumulation.
+
+These choices were made to keep the sample understandable and aligned with the current engine.
+
+---
+
+## 21. What Comes Directly From The Reference Repo Conceptually
+
+These ideas are preserved:
+
+- fullscreen volumetric raymarching
+- spherical cloud shell
+- shape noise + detail noise split
+- cloud density from low-frequency plus high-frequency erosion
+- cone sampling toward the sun
+- Beer-Lambert attenuation
+- Henyey-Greenstein-style anisotropic scattering
+
+So while the implementation is adapted, the rendering model is the same family of solution.
+
+---
+
+## 22. Important CPU Functions
+
+### `CreateGroundPlaneModel(...)`
+
+Loads the upstream plane OBJ with Assimp and creates VB/IB buffers.
+
+### `RecreateDepthTarget(...)`
+
+Keeps the depth texture matched to window size.
+
+### `GenerateNoiseTextures(...)`
+
+Dispatches both compute shaders that fill the 3D volumes.
+
+### `BuildGroundPushConstants(...)`
+
+Builds matrices and tint for the ground pass.
+
+### `BuildCloudPushConstants(...)`
+
+Builds camera, cloud, wind, sun, and texture parameters for the raymarch pass.
+
+---
+
+## 23. Important Shader Functions
+
+### In `VolumetricCloudsPS.hlsl`
+
+#### `GenerateViewRay(...)`
+
+Builds the world-space camera ray for the current pixel.
+
+#### `BuildCloudSegment(...)`
+
+Finds where the ray enters and exits the cloud shell.
+
+#### `SampleCloudDensity(...)`
+
+Evaluates the cloud field at a world-space point.
+
+#### `SampleCloudDensityAlongCone(...)`
+
+Approximates self-shadowing and forward light sampling.
+
+#### `RayMarchClouds(...)`
+
+Integrates density, light, and transmittance along the viewing ray.
+
+---
+
+## 24. Minimal ImGui Controls
+
+The UI is intentionally short.
+
+It exposes only the values that help you understand the sample:
+
+- `Pause animation`
+- `Sun elevation`
+- `Cloud coverage`
+- `Wind heading`
+- `Wind speed`
+- `Max steps`
+- `Exposure`
+
+That is enough to see:
+
+- lighting direction changes
+- density distribution changes
+- motion changes
+- quality/performance tradeoff
+
+without turning the sample into a tuning panel full of noise.
+
+---
+
+## 25. How To Read The Visual Result
+
+If the sample behaves correctly, you should notice:
+
+1. The ground remains visible and gives the clouds a horizon reference.
+2. The cloud layer curves gently across the sky instead of behaving like a flat screen-space fog patch.
+3. Increasing `Cloud coverage` grows and merges cloud masses.
+4. Rotating `Sun elevation` changes the amount of bright edge lighting and internal glow.
+5. Reducing `Max steps` makes the effect faster but less stable and less detailed.
+
+---
+
+## 26. Performance Notes
+
+This sample is relatively expensive compared to a normal fullscreen pass because it does:
+
+- 3D texture sampling
+- many raymarch steps per pixel
+- extra light cone sampling inside the raymarch
+
+The biggest quality/performance lever is:
+
+- `Max steps`
+
+General rule:
+
+- fewer steps = faster, noisier, less stable
+- more steps = slower, richer, smoother cloud volumes
+
+---
+
+## 27. Current Limitations
+
+This sample is intentionally focused, so it still has several limitations:
+
+1. The cloud pass does not use scene depth for precise compositing.
+2. There is no cloud shadow projected onto terrain.
+3. The ground is just a plane, not a full landscape.
+4. The noise generation is compact, not production-grade.
+5. The atmosphere is simplified.
+
+Even with these limits, it demonstrates the main volumetric-cloud rendering idea correctly.
+
+---
+
+## 28. Good Next Steps If You Want To Improve It
+
+If you want to push this sample further, the best next upgrades are:
+
+1. Read scene depth in the cloud pass so clouds composite correctly with arbitrary geometry.
+2. Add curl noise as a real 2D texture or procedural field.
+3. Add cloud shadows projected onto the ground.
+4. Replace the plane with a more interesting terrain mesh.
+5. Add temporal reprojection to stabilize low step counts.
+6. Add a dedicated atmosphere pass instead of the simple procedural sky.
+
+---
+
+## 29. Summary
+
+This sample is now a proper volumetric-cloud example for this DX12 framework:
+
+- real 3D noise textures
+- compute-generated cloud volumes
+- fullscreen raymarching
+- volumetric lighting
+- imported ground asset from the reference repo
+
+It is no longer based on visible voxel geometry.  
+The clouds are volumetric, and the mesh is only there to anchor the scene visually.

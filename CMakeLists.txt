@@ -126,29 +126,29 @@ ourSetOutputDirectories(LightD3D12)
 
 if(LIGHTD3D12_BUILD_SAMPLES)
     ourAddSample(
-        LightD3D12HelloTriangle
-        "${ourLightD3D12Root}/samples/HelloTriangle/main.cpp"
+        LightD3D12Triangle
+        "${ourLightD3D12Root}/samples/Triangle/main.cpp"
     )
 
     ourAddSample(
-        LightD3D12HelloDeferred
-        "${ourLightD3D12Root}/samples/HelloDeferred/main.cpp"
+        LightD3D12Deferred
+        "${ourLightD3D12Root}/samples/Deferred/main.cpp"
     )
 
     ourAddSample(
-        LightD3D12HelloSprites
-        "${ourLightD3D12Root}/samples/HelloSprites/main.cpp"
-        "${ourLightD3D12Root}/samples/HelloSprites/enemy.png"
+        LightD3D12Sprites
+        "${ourLightD3D12Root}/samples/Sprites/main.cpp"
+        "${ourLightD3D12Root}/samples/Sprites/enemy.png"
     )
 
     ourAddSample(
-        LightD3D12HelloCube
-        "${ourLightD3D12Root}/samples/HelloCube/main.cpp"
+        LightD3D12Cube
+        "${ourLightD3D12Root}/samples/Cube/main.cpp"
     )
 
-    target_link_libraries(LightD3D12HelloSprites PRIVATE windowscodecs ole32)
+    target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
 
-    set_property(DIRECTORY "${ourLightD3D12Root}" PROPERTY VS_STARTUP_PROJECT LightD3D12HelloTriangle)
+    set_property(DIRECTORY "${ourLightD3D12Root}" PROPERTY VS_STARTUP_PROJECT LightD3D12Triangle)
 endif()
 
 source_group(TREE "${ourLightD3D12Root}" FILES
@@ -161,10 +161,10 @@ source_group(TREE "${ourLightD3D12Root}" FILES
 
 if(LIGHTD3D12_BUILD_SAMPLES)
     source_group(TREE "${ourLightD3D12Root}" FILES
-        "${ourLightD3D12Root}/samples/HelloTriangle/main.cpp"
-        "${ourLightD3D12Root}/samples/HelloDeferred/main.cpp"
-        "${ourLightD3D12Root}/samples/HelloSprites/main.cpp"
-        "${ourLightD3D12Root}/samples/HelloSprites/enemy.png"
-        "${ourLightD3D12Root}/samples/HelloCube/main.cpp"
+        "${ourLightD3D12Root}/samples/Triangle/main.cpp"
+        "${ourLightD3D12Root}/samples/Deferred/main.cpp"
+        "${ourLightD3D12Root}/samples/Sprites/main.cpp"
+        "${ourLightD3D12Root}/samples/Sprites/enemy.png"
+        "${ourLightD3D12Root}/samples/Cube/main.cpp"
     )
 endif()
