@@ -2,6 +2,8 @@
 
 #include "LightD3D12ManagerImpl.hpp"
 
+#include <stdexcept>
+
 namespace lightd3d12
 {
 	Swapchain::Swapchain( DeviceManager::Impl& ctx, HWND hwnd, uint32_t width, uint32_t height ):
@@ -9,6 +11,11 @@ namespace lightd3d12
 		width_( width ),
 		height_( height )
 	{
+		if( ctx_.desc_.swapchainBufferCount == 0 || ctx_.desc_.swapchainBufferCount > ourMaxSwapchainBuffers )
+		{
+			throw std::runtime_error( "Swapchain buffer count exceeds fixed back buffer storage." );
+		}
+
 		DXGI_SWAP_CHAIN_DESC1 swapchainDesc{};
 		swapchainDesc.Width = width_;
 		swapchainDesc.Height = height_;
@@ -83,13 +90,13 @@ namespace lightd3d12
 
 	TextureHandle Swapchain::GetCurrentTexture()
 	{
-		if( swapchain_ == nullptr || backBufferHandles_.empty() )
+		if( swapchain_ == nullptr || numSwapchainImages_ == 0 )
 		{
 			return {};
 		}
 
 		currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
-		if( currentBackBufferIndex_ >= backBufferHandles_.size() )
+		if( currentBackBufferIndex_ >= numSwapchainImages_ )
 		{
 			return {};
 		}
@@ -114,7 +121,7 @@ namespace lightd3d12
 
 	void Swapchain::DestroyBackBuffers() noexcept
 	{
-		for( size_t index = 0; index < backBufferHandles_.size(); ++index )
+		for( uint32_t index = 0; index < numSwapchainImages_; ++index )
 		{
 			const TextureHandle handle = backBufferHandles_[ index ];
 			auto* texture = ctx_.slotMapTextures_.Get( handle );
@@ -125,23 +132,21 @@ namespace lightd3d12
 				ctx_.slotMapTextures_.Destroy( handle );
 			}
 
-			if( index < backBuffers_.size() )
-			{
-				backBuffers_[ index ].Reset();
-			}
+			backBufferHandles_[ index ] = {};
+			rtvHandles_[ index ] = {};
+			backBuffers_[ index ].Reset();
 		}
 
-		backBufferHandles_.clear();
-		backBuffers_.clear();
-		rtvHandles_.clear();
+		numSwapchainImages_ = 0;
 		currentBackBufferIndex_ = 0;
 	}
 
 	void Swapchain::RecreateBackBuffers()
 	{
-		backBuffers_.resize( numSwapchainImages_ );
-		backBufferHandles_.resize( numSwapchainImages_ );
-		rtvHandles_.resize( numSwapchainImages_ );
+		if( numSwapchainImages_ > backBuffers_.size() )
+		{
+			throw std::runtime_error( "Swapchain image count exceeds fixed back buffer storage." );
+		}
 
 		for( uint32_t index = 0; index < numSwapchainImages_; ++index )
 		{

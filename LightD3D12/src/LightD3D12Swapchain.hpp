@@ -3,10 +3,12 @@
 #include "LightD3D12Internal.hpp"
 #include "LightD3D12Resources.hpp"
 
-#include <vector>
+#include <array>
 
 namespace lightd3d12
 {
+	inline constexpr uint32_t ourMaxSwapchainBuffers = 3;
+
 	class DeviceManager::Impl;
 
 	class Swapchain final
@@ -31,9 +33,9 @@ namespace lightd3d12
 
 		DeviceManager::Impl& ctx_;
 		ComPtr<IDXGISwapChain4> swapchain_;
-		std::vector<ComPtr<ID3D12Resource>> backBuffers_;
-		std::vector<TextureHandle> backBufferHandles_;
-		std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles_;
+		std::array<ComPtr<ID3D12Resource>, ourMaxSwapchainBuffers> backBuffers_;
+		std::array<TextureHandle, ourMaxSwapchainBuffers> backBufferHandles_;
+		std::array<D3D12_CPU_DESCRIPTOR_HANDLE, ourMaxSwapchainBuffers> rtvHandles_;
 		uint32_t width_ = 0;
 		uint32_t height_ = 0;
 		uint32_t numSwapchainImages_ = 0;
