@@ -1251,11 +1251,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 					D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
 			}
 
-			//if( app.fsrEnabled )
-			//{
-			//	LIGHTD3D12_CMD_SCOPE_NAMED( commandBuffer, "Upscaler::FsrDispatch", 0xff90be6du );
-			//	DispatchUpscaler( app, ctx, commandBuffer, deltaSeconds );
-			//}
+			if( app.fsrEnabled )
+			{
+				LIGHTD3D12_CMD_SCOPE_NAMED( commandBuffer, "Upscaler::FsrDispatch", 0xff90be6du );
+				DispatchUpscaler( app, ctx, commandBuffer, deltaSeconds );
+			}
 
 			{
 				LIGHTD3D12_CMD_SCOPE_NAMED( commandBuffer, "Upscaler::PresentPass", 0xfff9c74fu );

@@ -229,7 +229,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			buffer.CmdPopDebugGroupLabel();
 			if( app.imguiRenderer )
 			{
-//				app.imguiRenderer->Render( buffer );
+				app.imguiRenderer->Render( buffer );
 			}
 			buffer.CmdEndRendering();
 			ctx->Submit( buffer, currentTexture );

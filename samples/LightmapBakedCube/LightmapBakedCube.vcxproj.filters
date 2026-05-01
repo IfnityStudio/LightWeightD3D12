@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{65CA8568-E358-4929-8CBE-47E98E71BEF0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{5957973A-7CBA-4BCE-8C39-6F6DA696A4DD}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\BakedCubeVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\BakedCubePS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\BakeLightVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\BakeLightPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

@@ -40,6 +40,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GlobeMap", "samples\GlobeMa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TexturePlane", "samples\TexturePlane\TexturePlane.vcxproj", "{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightmapBakedCube", "samples\LightmapBakedCube\LightmapBakedCube.vcxproj", "{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12WpfNative", "bindings\LightD3D12WpfNative\LightD3D12WpfNative.vcxproj", "{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WpfTriangle", "samples\WpfTriangle\WpfTriangle.csproj", "{58BA7B56-4211-4C1E-A01F-00501854660B}"
@@ -135,6 +137,10 @@ Global
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Debug|x64.Build.0 = Debug|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.ActiveCfg = Release|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.Build.0 = Release|x64
+		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Debug|x64.ActiveCfg = Debug|x64
+		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Debug|x64.Build.0 = Debug|x64
+		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Release|x64.ActiveCfg = Release|x64
+		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Release|x64.Build.0 = Release|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.ActiveCfg = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.Build.0 = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Release|x64.ActiveCfg = Release|x64
