@@ -16,6 +16,7 @@ set(ourPublicHeaders
     "${ourLibraryRoot}/include/LightD3D12/HandleSlotMap.hpp"
     "${ourLibraryRoot}/include/LightD3D12/LightD3D12.hpp"
     "${ourLibraryRoot}/include/LightD3D12/LightD3D12Imgui.hpp"
+    "${ourLibraryRoot}/include/LightD3D12/LightHLSLLoader.hpp"
 )
 
 set(ourPrivateHeaders
@@ -37,6 +38,7 @@ set(ourLibrarySources
     "${ourLibraryRoot}/src/LightD3D12DeviceManager.cpp"
     "${ourLibraryRoot}/src/LightD3D12RenderDevice.cpp"
     "${ourLibraryRoot}/src/LightD3D12Imgui.cpp"
+    "${ourLibraryRoot}/src/LightHLSLLoader.cpp"
 )
 
 set(ourImguiSources
@@ -150,10 +152,23 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         LightD3D12GlobeMap
         "${ourLightD3D12Root}/samples/GlobeMap/main.cpp"
         "${ourLightD3D12Root}/samples/GlobeMap/map.png"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapGeoVS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapMarkerPS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapMarkerVS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapSurfacePS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapTilePS.hlsl"
+    )
+
+    ourAddSample(
+        LightD3D12TexturePlane
+        "${ourLightD3D12Root}/samples/TexturePlane/main.cpp"
+        "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlanePS.hlsl"
+        "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlaneVS.hlsl"
     )
 
     target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12GlobeMap PRIVATE windowscodecs ole32)
+    target_link_libraries(LightD3D12TexturePlane PRIVATE windowscodecs ole32)
 
     set_property(DIRECTORY "${ourLightD3D12Root}" PROPERTY VS_STARTUP_PROJECT LightD3D12Triangle)
 endif()
@@ -175,5 +190,13 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/Cube/main.cpp"
         "${ourLightD3D12Root}/samples/GlobeMap/main.cpp"
         "${ourLightD3D12Root}/samples/GlobeMap/map.png"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapGeoVS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapMarkerPS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapMarkerVS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapSurfacePS.hlsl"
+        "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapTilePS.hlsl"
+        "${ourLightD3D12Root}/samples/TexturePlane/main.cpp"
+        "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlanePS.hlsl"
+        "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlaneVS.hlsl"
     )
 endif()

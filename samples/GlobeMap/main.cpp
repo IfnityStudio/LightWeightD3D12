@@ -1,5 +1,6 @@
 #include "LightD3D12/LightD3D12.hpp"
 #include "LightD3D12/LightD3D12Imgui.hpp"
+#include "LightD3D12/LightHLSLLoader.hpp"
 
 #include <imgui.h>
 
@@ -425,107 +426,6 @@ namespace
 
 	RenderPipelineState CreateGeoPipeline( RenderDevice& ctx, DXGI_FORMAT colorFormat, DXGI_FORMAT depthFormat, bool lineList )
 	{
-		static constexpr char kGeoVertexShader[] = R"(
-cbuffer PushConstants : register(b0)
-{
-    row_major float4x4 gWorldViewProj;
-    row_major float4x4 gWorld;
-    float4 gMapParams;
-    float4 gLighting;
-    uint gTextureIndex;
-    uint gUseTexture;
-    uint2 gPadding;
-};
-
-struct VSInput
-{
-    float3 position : POSITION;
-    float3 normal : NORMAL;
-    float2 latLonDegrees : TEXCOORD0;
-    float4 color : COLOR0;
-};
-
-struct VSOutput
-{
-    float4 position : SV_Position;
-    float3 normal : NORMAL0;
-    float4 color : COLOR0;
-    float flatMode : TEXCOORD1;
-    float2 uv : TEXCOORD2;
-};
-
-float WrapDeltaDegrees(float delta)
-{
-    return delta - round(delta / 360.0) * 360.0;
-}
-
-VSOutput main(VSInput input)
-{
-    VSOutput output;
-    const bool flatMode = gMapParams.x > 0.5;
-    output.color = input.color;
-    output.flatMode = gMapParams.x;
-    output.uv = float2((input.latLonDegrees.y + 180.0) / 360.0, (90.0 - input.latLonDegrees.x) / 180.0);
-
-    if (flatMode)
-    {
-        const float centerLongitude = gMapParams.y;
-        const float centerLatitude = gMapParams.z;
-        const float mapScale = gMapParams.w;
-        const float longitudeDelta = WrapDeltaDegrees(input.latLonDegrees.y - centerLongitude);
-        const float latitudeDelta = input.latLonDegrees.x - centerLatitude;
-        const float2 ndc = float2(longitudeDelta / 180.0, latitudeDelta / 90.0) * mapScale;
-
-        output.position = float4(ndc, 0.45, 1.0);
-        output.normal = float3(0.0, 0.0, -1.0);
-    }
-    else
-    {
-        output.position = mul(float4(input.position, 1.0), gWorldViewProj);
-        output.normal = normalize(mul(float4(input.normal, 0.0), gWorld).xyz);
-    }
-
-    return output;
-}
-)";
-
-		static constexpr char kSurfacePixelShader[] = R"(
-cbuffer PushConstants : register(b0)
-{
-    row_major float4x4 gWorldViewProj;
-    row_major float4x4 gWorld;
-    float4 gMapParams;
-    float4 gLighting;
-    uint gTextureIndex;
-    uint gUseTexture;
-    uint2 gPadding;
-};
-
-SamplerState gSampler : register(s0);
-
-float4 main(float4 position : SV_Position, float3 normal : NORMAL0, float4 color : COLOR0, float flatMode : TEXCOORD1, float2 uv : TEXCOORD2) : SV_Target0
-{
-    Texture2D<float4> mapTexture = ResourceDescriptorHeap[gTextureIndex];
-    const float3 mapColor = gUseTexture != 0u ? mapTexture.Sample(gSampler, uv).rgb : color.rgb;
-
-    if (flatMode > 0.5)
-    {
-        return float4(mapColor * 0.95, color.a);
-    }
-
-    const float diffuse = saturate(dot(normalize(normal), normalize(gLighting.xyz)) * 0.55 + 0.52);
-    const float rim = pow(saturate(1.0 - abs(normal.z)), 2.0) * 0.18;
-    return float4(mapColor * diffuse + rim.xxx, color.a);
-}
-)";
-
-		static constexpr char kLinePixelShader[] = R"(
-float4 main(float4 position : SV_Position, float3 normal : NORMAL0, float4 color : COLOR0, float flatMode : TEXCOORD1) : SV_Target0
-{
-    return color;
-}
-)";
-
 		RenderPipelineDesc desc{};
 		desc.inputElements =
 		{
@@ -570,12 +470,8 @@ float4 main(float4 position : SV_Position, float3 normal : NORMAL0, float4 color
 				.instanceDataStepRate = 0
 			}
 		};
-		desc.vertexShader.source = kGeoVertexShader;
-		desc.vertexShader.entryPoint = "main";
-		desc.vertexShader.profile = "vs_6_6";
-		desc.fragmentShader.source = lineList ? kLinePixelShader : kSurfacePixelShader;
-		desc.fragmentShader.entryPoint = "main";
-		desc.fragmentShader.profile = "ps_6_6";
+		desc.vertexShader = LightHLSLLoader::LoadStage( "shaders/GlobeMapGeoVS.hlsl", "vs_6_6" );
+		desc.fragmentShader = LightHLSLLoader::LoadStage( lineList ? "shaders/GlobeMapTilePS.hlsl" : "shaders/GlobeMapSurfacePS.hlsl", "ps_6_6" );
 		desc.color[ 0 ].format = colorFormat;
 		desc.depthFormat = depthFormat;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
@@ -593,62 +489,9 @@ float4 main(float4 position : SV_Position, float3 normal : NORMAL0, float4 color
 
 	RenderPipelineState CreateMarkerPipeline( RenderDevice& ctx, DXGI_FORMAT colorFormat )
 	{
-		static constexpr char kMarkerVertexShader[] = R"(
-cbuffer PushConstants : register(b0)
-{
-    float4 gRect;
-    float4 gFillColor;
-    float4 gBorderColor;
-    float4 gStyle;
-};
-
-struct VSOutput
-{
-    float4 position : SV_Position;
-    float2 uv : TEXCOORD0;
-};
-
-VSOutput main(uint vertexID : SV_VertexID)
-{
-    static const float2 corners[6] =
-    {
-        float2(0.0, 0.0), float2(1.0, 0.0), float2(0.0, 1.0),
-        float2(0.0, 1.0), float2(1.0, 0.0), float2(1.0, 1.0)
-    };
-
-    VSOutput output;
-    const float2 uv = corners[vertexID];
-    const float2 local = uv * 2.0 - 1.0;
-    output.position = float4(gRect.xy + local * gRect.zw, 0.05, 1.0);
-    output.uv = uv;
-    return output;
-}
-)";
-
-		static constexpr char kMarkerPixelShader[] = R"(
-cbuffer PushConstants : register(b0)
-{
-    float4 gRect;
-    float4 gFillColor;
-    float4 gBorderColor;
-    float4 gStyle;
-};
-
-float4 main(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
-{
-    const float2 edge = min(uv, 1.0 - uv);
-    const float border = min(edge.x, edge.y) < gStyle.x ? 1.0 : 0.0;
-    return lerp(gFillColor, gBorderColor, border);
-}
-)";
-
 		RenderPipelineDesc desc{};
-		desc.vertexShader.source = kMarkerVertexShader;
-		desc.vertexShader.entryPoint = "main";
-		desc.vertexShader.profile = "vs_6_6";
-		desc.fragmentShader.source = kMarkerPixelShader;
-		desc.fragmentShader.entryPoint = "main";
-		desc.fragmentShader.profile = "ps_6_6";
+		desc.vertexShader = LightHLSLLoader::LoadStage( "shaders/GlobeMapMarkerVS.hlsl", "vs_6_6" );
+		desc.fragmentShader = LightHLSLLoader::LoadStage( "shaders/GlobeMapMarkerPS.hlsl", "ps_6_6" );
 		desc.color[ 0 ].format = colorFormat;
 		desc.depthFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthStencilState.DepthEnable = FALSE;
@@ -1043,6 +886,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
+		LightHLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
 		app.globePipeline = CreateGeoPipeline( ctx, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT, false );
 		app.tilePipeline = CreateGeoPipeline( ctx, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT, true );
 		app.markerPipeline = CreateMarkerPipeline( ctx, contextDesc.swapchainFormat );

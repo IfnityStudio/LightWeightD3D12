@@ -8,6 +8,9 @@
     <Filter Include="Assets">
       <UniqueIdentifier>{20CE9F6A-C1E3-4DD9-8B65-94A6DD6AC011}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{588CB5EA-0C4A-4DBD-8B06-E8770C5511F2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -17,6 +20,21 @@
   <ItemGroup>
     <None Include="map.png">
       <Filter>Assets</Filter>
+    </None>
+    <None Include="shaders\GlobeMapGeoVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\GlobeMapMarkerPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\GlobeMapMarkerVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\GlobeMapSurfacePS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\GlobeMapTilePS.hlsl">
+      <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
 </Project>

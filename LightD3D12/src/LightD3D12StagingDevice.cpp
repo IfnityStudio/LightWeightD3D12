@@ -2,6 +2,8 @@
 
 #include "LightD3D12ManagerImpl.hpp"
 
+#include <vector>
+
 namespace lightd3d12
 {
 	StagingDevice::StagingDevice( DeviceManager::Impl& manager ): manager_( manager )
@@ -79,11 +81,27 @@ namespace lightd3d12
 			return;
 		}
 
+		const TextureSubresourceUpload upload
+		{
+			.data = data,
+			.rowPitch = rowPitch,
+			.slicePitch = slicePitch
+		};
+		TextureSubData2D( texture, &upload, 1u );
+	}
+
+	void StagingDevice::TextureSubData2D( TextureResource& texture, const TextureSubresourceUpload* subresources, uint32_t subresourceCount )
+	{
+		if( subresources == nullptr || subresourceCount == 0 )
+		{
+			return;
+		}
+
 		UINT64 uploadBufferSize = 0;
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-		UINT numRows = 0;
-		UINT64 rowSizeInBytes = 0;
-		manager_.device_->GetCopyableFootprints( &texture.desc_, 0, 1, 0, &layout, &numRows, &rowSizeInBytes, &uploadBufferSize );
+		std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts( subresourceCount );
+		std::vector<UINT> numRows( subresourceCount );
+		std::vector<UINT64> rowSizeInBytes( subresourceCount );
+		manager_.device_->GetCopyableFootprints( &texture.desc_, 0, subresourceCount, 0, layouts.data(), numRows.data(), rowSizeInBytes.data(), &uploadBufferSize );
 
 		ComPtr<ID3D12Resource> stagingBuffer;
 		CD3DX12_HEAP_PROPERTIES heapProps( D3D12_HEAP_TYPE_UPLOAD );
@@ -101,14 +119,24 @@ namespace lightd3d12
 		void* mapped = nullptr;
 		detail::ThrowIfFailed( stagingBuffer->Map( 0, nullptr, &mapped ), "Failed to map texture staging buffer." );
 
-		const auto* srcBytes = static_cast<const uint8_t*>( data );
 		auto* dstBytes = static_cast<uint8_t*>( mapped );
-		for( UINT row = 0; row < numRows; ++row )
+		for( uint32_t subresourceIndex = 0; subresourceIndex < subresourceCount; ++subresourceIndex )
 		{
-			std::memcpy(
-				dstBytes + layout.Offset + row * layout.Footprint.RowPitch,
-				srcBytes + row * rowPitch,
-				std::min<size_t>( rowPitch, layout.Footprint.RowPitch ) );
+			const TextureSubresourceUpload& upload = subresources[ subresourceIndex ];
+			if( upload.data == nullptr || upload.rowPitch == 0 || upload.slicePitch == 0 )
+			{
+				continue;
+			}
+
+			const auto* srcBytes = static_cast<const uint8_t*>( upload.data );
+			const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[ subresourceIndex ];
+			for( UINT row = 0; row < numRows[ subresourceIndex ]; ++row )
+			{
+				std::memcpy(
+					dstBytes + layout.Offset + static_cast<size_t>( row ) * layout.Footprint.RowPitch,
+					srcBytes + static_cast<size_t>( row ) * upload.rowPitch,
+					std::min<size_t>( upload.rowPitch, layout.Footprint.RowPitch ) );
+			}
 		}
 
 		stagingBuffer->Unmap( 0, nullptr );
@@ -125,17 +153,20 @@ namespace lightd3d12
 			texture.currentState_ = D3D12_RESOURCE_STATE_COPY_DEST;
 		}
 
-		D3D12_TEXTURE_COPY_LOCATION dstLocation{};
-		dstLocation.pResource = texture.resource_.Get();
-		dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-		dstLocation.SubresourceIndex = 0;
+		for( uint32_t subresourceIndex = 0; subresourceIndex < subresourceCount; ++subresourceIndex )
+		{
+			D3D12_TEXTURE_COPY_LOCATION dstLocation{};
+			dstLocation.pResource = texture.resource_.Get();
+			dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+			dstLocation.SubresourceIndex = subresourceIndex;
 
-		D3D12_TEXTURE_COPY_LOCATION srcLocation{};
-		srcLocation.pResource = stagingBuffer.Get();
-		srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-		srcLocation.PlacedFootprint = layout;
+			D3D12_TEXTURE_COPY_LOCATION srcLocation{};
+			srcLocation.pResource = stagingBuffer.Get();
+			srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+			srcLocation.PlacedFootprint = layouts[ subresourceIndex ];
 
-		cmd.commandList_->CopyTextureRegion( &dstLocation, 0, 0, 0, &srcLocation, nullptr );
+			cmd.commandList_->CopyTextureRegion( &dstLocation, 0, 0, 0, &srcLocation, nullptr );
+		}
 
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{

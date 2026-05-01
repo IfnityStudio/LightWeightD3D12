@@ -69,6 +69,110 @@ namespace lightd3d12
 			return hash;
 		}
 
+		uint16_t CalculateFullMipCount( uint32_t width, uint32_t height ) noexcept
+		{
+			uint16_t levels = 1;
+			while( width > 1 || height > 1 )
+			{
+				width = std::max( 1u, width >> 1u );
+				height = std::max( 1u, height >> 1u );
+				++levels;
+			}
+
+			return levels;
+		}
+
+		bool IsCpuMipGenerationSupported( DXGI_FORMAT format ) noexcept
+		{
+			return format == DXGI_FORMAT_R8G8B8A8_UNORM || format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		}
+
+		std::vector<std::vector<uint8_t>> GenerateRgba8MipChain( const void* sourceData, uint32_t width, uint32_t height, uint32_t rowPitch, uint16_t mipLevels )
+		{
+			if( sourceData == nullptr || width == 0 || height == 0 || rowPitch < width * 4u )
+			{
+				throw std::runtime_error( "Invalid texture data for CPU mip generation." );
+			}
+
+			std::vector<std::vector<uint8_t>> mipChain;
+			mipChain.reserve( mipLevels );
+			mipChain.emplace_back( static_cast<size_t>( width ) * height * 4u );
+
+			const auto* sourceBytes = static_cast<const uint8_t*>( sourceData );
+			for( uint32_t y = 0; y < height; ++y )
+			{
+				std::memcpy( mipChain.front().data() + static_cast<size_t>( y ) * width * 4u, sourceBytes + static_cast<size_t>( y ) * rowPitch, static_cast<size_t>( width ) * 4u );
+			}
+
+			uint32_t previousWidth = width;
+			uint32_t previousHeight = height;
+			for( uint16_t level = 1; level < mipLevels; ++level )
+			{
+				const uint32_t mipWidth = std::max( 1u, previousWidth / 2u );
+				const uint32_t mipHeight = std::max( 1u, previousHeight / 2u );
+				const std::vector<uint8_t>& previousMip = mipChain.back();
+				std::vector<uint8_t>& currentMip = mipChain.emplace_back( static_cast<size_t>( mipWidth ) * mipHeight * 4u );
+
+				for( uint32_t y = 0; y < mipHeight; ++y )
+				{
+					for( uint32_t x = 0; x < mipWidth; ++x )
+					{
+						uint32_t accumulated[ 4 ]{};
+						uint32_t sampleCount = 0;
+
+						for( uint32_t offsetY = 0; offsetY < 2; ++offsetY )
+						{
+							const uint32_t sourceY = std::min( previousHeight - 1u, y * 2u + offsetY );
+							for( uint32_t offsetX = 0; offsetX < 2; ++offsetX )
+							{
+								const uint32_t sourceX = std::min( previousWidth - 1u, x * 2u + offsetX );
+								const uint8_t* texel = previousMip.data() + ( static_cast<size_t>( sourceY ) * previousWidth + sourceX ) * 4u;
+								accumulated[ 0 ] += texel[ 0 ];
+								accumulated[ 1 ] += texel[ 1 ];
+								accumulated[ 2 ] += texel[ 2 ];
+								accumulated[ 3 ] += texel[ 3 ];
+								++sampleCount;
+							}
+						}
+
+						uint8_t* output = currentMip.data() + ( static_cast<size_t>( y ) * mipWidth + x ) * 4u;
+						output[ 0 ] = static_cast<uint8_t>( accumulated[ 0 ] / sampleCount );
+						output[ 1 ] = static_cast<uint8_t>( accumulated[ 1 ] / sampleCount );
+						output[ 2 ] = static_cast<uint8_t>( accumulated[ 2 ] / sampleCount );
+						output[ 3 ] = static_cast<uint8_t>( accumulated[ 3 ] / sampleCount );
+					}
+				}
+
+				previousWidth = mipWidth;
+				previousHeight = mipHeight;
+			}
+
+			return mipChain;
+		}
+
+		std::vector<StagingDevice::TextureSubresourceUpload> BuildMipUploads( const std::vector<std::vector<uint8_t>>& mipChain, uint32_t width, uint32_t height )
+		{
+			std::vector<StagingDevice::TextureSubresourceUpload> uploads;
+			uploads.reserve( mipChain.size() );
+
+			uint32_t mipWidth = width;
+			uint32_t mipHeight = height;
+			for( const std::vector<uint8_t>& mipData : mipChain )
+			{
+				uploads.push_back( StagingDevice::TextureSubresourceUpload{
+					.data = mipData.data(),
+					.rowPitch = mipWidth * 4u,
+					.slicePitch = static_cast<uint32_t>( mipData.size() ),
+				} );
+
+				mipWidth = std::max( 1u, mipWidth / 2u );
+				mipHeight = std::max( 1u, mipHeight / 2u );
+				( void )mipHeight;
+			}
+
+			return uploads;
+		}
+
 		std::wstring SanitizeFileName( std::wstring text )
 		{
 			for( wchar_t& character : text )
@@ -834,6 +938,22 @@ namespace lightd3d12
 			throw std::runtime_error( "DepthStencil textures cannot expose UAVs." );
 		}
 
+		const uint16_t requestedMipLevels = std::max<uint16_t>( 1, desc.mipLevels );
+		const uint16_t actualMipLevels = desc.mipsEnabled ? CalculateFullMipCount( desc.width, desc.height ) : requestedMipLevels;
+
+		if( desc.mipsEnabled )
+		{
+			if( desc.dimension != TextureDimension::Texture2D || desc.depthOrArraySize != 1 )
+			{
+				throw std::runtime_error( "CPU mip generation currently supports only single Texture2D resources." );
+			}
+
+			if( !IsCpuMipGenerationSupported( desc.format ) )
+			{
+				throw std::runtime_error( "CPU mip generation currently supports only R8G8B8A8 textures." );
+			}
+		}
+
 		if( desc.dimension == TextureDimension::Texture3D )
 		{
 			if( desc.depthOrArraySize <= 1 )
@@ -871,7 +991,7 @@ namespace lightd3d12
 				desc.width,
 				desc.height,
 				desc.depthOrArraySize,
-				desc.mipLevels,
+				actualMipLevels,
 				resource.usageFlags_ );
 		}
 		else
@@ -881,7 +1001,7 @@ namespace lightd3d12
 				desc.width,
 				desc.height,
 				desc.depthOrArraySize,
-				desc.mipLevels,
+				actualMipLevels,
 				1,
 				0,
 				resource.usageFlags_ );
@@ -911,12 +1031,12 @@ namespace lightd3d12
 			if( desc.dimension == TextureDimension::Texture3D )
 			{
 				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-				srvDesc.Texture3D.MipLevels = desc.mipLevels;
+				srvDesc.Texture3D.MipLevels = actualMipLevels;
 			}
 			else
 			{
 				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srvDesc.Texture2D.MipLevels = desc.mipLevels;
+				srvDesc.Texture2D.MipLevels = actualMipLevels;
 			}
 			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
 		}
@@ -962,7 +1082,17 @@ namespace lightd3d12
 		const TextureHandle handle = impl.slotMapTextures_.Create( std::move( resource ) );
 		if( desc.data != nullptr && desc.rowPitch > 0 && desc.slicePitch > 0 )
 		{
-			impl.stagingDevice_->TextureSubData2D( impl.GetTextureResource( handle ), desc.data, desc.rowPitch, desc.slicePitch );
+			TextureResource& textureResource = impl.GetTextureResource( handle );
+			if( desc.mipsEnabled )
+			{
+				std::vector<std::vector<uint8_t>> mipChain = GenerateRgba8MipChain( desc.data, desc.width, desc.height, desc.rowPitch, actualMipLevels );
+				const std::vector<StagingDevice::TextureSubresourceUpload> uploads = BuildMipUploads( mipChain, desc.width, desc.height );
+				impl.stagingDevice_->TextureSubData2D( textureResource, uploads.data(), static_cast<uint32_t>( uploads.size() ) );
+			}
+			else
+			{
+				impl.stagingDevice_->TextureSubData2D( textureResource, desc.data, desc.rowPitch, desc.slicePitch );
+			}
 		}
 
 		return handle;

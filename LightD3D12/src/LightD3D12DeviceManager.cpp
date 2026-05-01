@@ -342,6 +342,9 @@ namespace lightd3d12
 		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		sampler.MinLOD = 0.0f;
+		sampler.MaxLOD = D3D12_FLOAT32_MAX;
+		sampler.MipLODBias = 0.0f;
 		sampler.ShaderRegister = 0;
 		sampler.RegisterSpace = 0;
 		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;

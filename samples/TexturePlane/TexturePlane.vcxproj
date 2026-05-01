@@ -12,9 +12,9 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <ProjectGuid>{790E12DA-28C7-4B46-BED2-945A2C4EEDF7}</ProjectGuid>
+    <ProjectGuid>{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>LightD3D12GlobeMap</RootNamespace>
+    <RootNamespace>LightD3D12TexturePlane</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -45,7 +45,7 @@
   <PropertyGroup>
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName>LightD3D12GlobeMap</TargetName>
+    <TargetName>LightD3D12TexturePlane</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -85,12 +85,8 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="map.png" />
-    <None Include="shaders\GlobeMapGeoVS.hlsl" />
-    <None Include="shaders\GlobeMapMarkerPS.hlsl" />
-    <None Include="shaders\GlobeMapMarkerVS.hlsl" />
-    <None Include="shaders\GlobeMapSurfacePS.hlsl" />
-    <None Include="shaders\GlobeMapTilePS.hlsl" />
+    <None Include="shaders\TexturePlanePS.hlsl" />
+    <None Include="shaders\TexturePlaneVS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\LightD3D12\LightD3D12.vcxproj">
