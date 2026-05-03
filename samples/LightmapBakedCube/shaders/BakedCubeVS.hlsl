@@ -14,6 +14,12 @@ cbuffer PushConstants : register(b0)
 	float gKeyLightIntensity;
 	float3 gKeyLightColor;
 	float gAmbientIntensity;
+	uint gLightType;
+	float gLightRange;
+	float gSpotInnerCos;
+	float gSpotOuterCos;
+	float3 gLightPosition;
+	float gLightPadding;
 };
 
 struct VSInput
@@ -30,6 +36,7 @@ struct VSOutput
 	float3 normal : NORMAL0;
 	float2 uv : TEXCOORD0;
 	float2 lightUv : TEXCOORD1;
+	float3 worldPosition : TEXCOORD2;
 };
 
 VSOutput main(VSInput input)
@@ -39,5 +46,6 @@ VSOutput main(VSInput input)
 	output.normal = normalize(mul(float4(input.normal, 0.0f), gWorld).xyz);
 	output.uv = input.uv;
 	output.lightUv = input.lightUv;
+	output.worldPosition = mul(float4(input.position, 1.0f), gWorld).xyz;
 	return output;
 }

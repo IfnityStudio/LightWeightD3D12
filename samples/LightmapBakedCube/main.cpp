@@ -31,6 +31,13 @@ namespace
 		XMFLOAT2 lightUv = {};
 	};
 
+	enum LightType : uint32_t
+	{
+		LightType_Directional = 0,
+		LightType_Point = 1,
+		LightType_Spot = 2,
+	};
+
 	struct BakedCubePushConstants
 	{
 		XMFLOAT4X4 worldViewProjection = {};
@@ -47,16 +54,29 @@ namespace
 		float keyLightIntensity = 1.0f;
 		XMFLOAT3 keyLightColor = { 1.0f, 0.86f, 0.55f };
 		float ambientIntensity = 0.08f;
+		uint32_t lightType = LightType_Directional;
+		float lightRange = 4.0f;
+		float spotInnerCos = 0.94f;
+		float spotOuterCos = 0.82f;
+		XMFLOAT3 lightPosition = { 0.0f, 1.8f, -1.8f };
+		float lightPadding = 0.0f;
 	};
 
 	static_assert( sizeof( BakedCubePushConstants ) / sizeof( uint32_t ) <= 63 );
 
 	struct BakeLightPushConstants
 	{
+		XMFLOAT4X4 world = {};
 		XMFLOAT3 keyLightDirection = { -0.35f, 0.85f, -0.40f };
 		float keyLightIntensity = 0.72f;
 		XMFLOAT3 keyLightColor = { 1.00f, 0.82f, 0.45f };
 		float ambientIntensity = 0.035f;
+		uint32_t lightType = LightType_Directional;
+		float lightRange = 4.0f;
+		float spotInnerCos = 0.94f;
+		float spotOuterCos = 0.82f;
+		XMFLOAT3 lightPosition = { 0.0f, 1.8f, -1.8f };
+		float lightPadding = 0.0f;
 	};
 
 	static_assert( sizeof( BakeLightPushConstants ) / sizeof( uint32_t ) <= 63 );
@@ -109,6 +129,11 @@ namespace
 		float keyLightIntensity = 1.0f;
 		float ambientIntensity = 0.08f;
 		XMFLOAT3 keyLightColor = { 1.0f, 0.86f, 0.55f };
+		int lightType = LightType_Directional;
+		XMFLOAT3 lightPosition = { 0.0f, 1.8f, -1.8f };
+		float lightRange = 4.0f;
+		float spotInnerAngle = 20.0f;
+		float spotOuterAngle = 35.0f;
 		bool pauseCubeRotation = false;
 		bool rotateX = false;
 		bool rotateY = true;
@@ -393,7 +418,7 @@ namespace
 		desc.debugName = "GPU Baked Cube Lightmap";
 		desc.width = 768;
 		desc.height = 512;
-		desc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		desc.usage = TextureUsage::Sampled | TextureUsage::RenderTarget;
 		desc.useClearValue = true;
 		desc.clearValue.Format = desc.format;
@@ -609,8 +634,20 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::BeginDisabled( !app.hasCookedBake );
 			ImGui::Checkbox( "Apply baked light", &app.applyBakedLight );
 			ImGui::EndDisabled();
+			const char* lightTypes[] = { "Directional light", "Point light", "Cone / spot light" };
+			ImGui::Combo( "Runtime/bake light type", &app.lightType, lightTypes, static_cast<int>( std::size( lightTypes ) ) );
 			ImGui::SliderFloat( "Runtime/bake light yaw", &app.lightYaw, 0.0f, 360.0f );
 			ImGui::SliderFloat( "Runtime/bake light pitch", &app.lightPitch, -80.0f, 80.0f );
+			if( app.lightType == LightType_Point || app.lightType == LightType_Spot )
+			{
+				ImGui::SliderFloat3( "Runtime/bake light position", &app.lightPosition.x, -3.0f, 3.0f );
+				ImGui::SliderFloat( "Runtime/bake light range", &app.lightRange, 0.25f, 8.0f );
+			}
+			if( app.lightType == LightType_Spot )
+			{
+				ImGui::SliderFloat( "Cone inner angle", &app.spotInnerAngle, 1.0f, 85.0f );
+				ImGui::SliderFloat( "Cone outer angle", &app.spotOuterAngle, app.spotInnerAngle + 1.0f, 89.0f );
+			}
 			ImGui::ColorEdit3( "Runtime/bake light color", &app.keyLightColor.x );
 			ImGui::SliderFloat( "Runtime/bake light intensity", &app.keyLightIntensity, 0.0f, 2.0f );
 			ImGui::SliderFloat( "Ambient intensity", &app.ambientIntensity, 0.0f, 0.25f );
@@ -682,7 +719,9 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			const float yawRadians = XMConvertToRadians( app.lightYaw );
 			const float pitchRadians = XMConvertToRadians( app.lightPitch );
+			app.spotOuterAngle = std::max( app.spotOuterAngle, app.spotInnerAngle + 1.0f );
 			BakeLightPushConstants bakePushConstants{};
+			XMStoreFloat4x4( &bakePushConstants.world, world );
 			bakePushConstants.keyLightDirection = {
 				std::cos( pitchRadians ) * std::cos( yawRadians ),
 				std::sin( pitchRadians ),
@@ -691,10 +730,20 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			bakePushConstants.keyLightIntensity = app.keyLightIntensity;
 			bakePushConstants.keyLightColor = app.keyLightColor;
 			bakePushConstants.ambientIntensity = app.ambientIntensity;
+			bakePushConstants.lightType = static_cast<uint32_t>( std::clamp( app.lightType, 0, 2 ) );
+			bakePushConstants.lightRange = app.lightRange;
+			bakePushConstants.spotInnerCos = std::cos( XMConvertToRadians( app.spotInnerAngle ) );
+			bakePushConstants.spotOuterCos = std::cos( XMConvertToRadians( app.spotOuterAngle ) );
+			bakePushConstants.lightPosition = app.lightPosition;
 			pushConstants.keyLightDirection = bakePushConstants.keyLightDirection;
 			pushConstants.keyLightIntensity = bakePushConstants.keyLightIntensity;
 			pushConstants.keyLightColor = bakePushConstants.keyLightColor;
 			pushConstants.ambientIntensity = bakePushConstants.ambientIntensity;
+			pushConstants.lightType = bakePushConstants.lightType;
+			pushConstants.lightRange = bakePushConstants.lightRange;
+			pushConstants.spotInnerCos = bakePushConstants.spotInnerCos;
+			pushConstants.spotOuterCos = bakePushConstants.spotOuterCos;
+			pushConstants.lightPosition = bakePushConstants.lightPosition;
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
