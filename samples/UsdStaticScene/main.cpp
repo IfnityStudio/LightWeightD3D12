@@ -14,12 +14,11 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usd/timeCode.h>
 #include <pxr/usd/usdGeom/cube.h>
 #include <pxr/usd/usdGeom/gprim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/sphere.h>
-#include <pxr/usd/usdGeom/xformable.h>
+
 
 #include <algorithm>
 #include <array>
@@ -70,10 +69,19 @@ namespace
 		uint32_t height = 0;
 	};
 
+	struct ScenePrimInfo
+	{
+		std::string path;
+		std::string type;
+		uint32_t depth = 0;
+		bool drawable = false;
+	};
+
 	struct LoadedUsdScene
 	{
 		std::vector<SceneVertex> vertices;
 		std::vector<uint32_t> indices;
+		std::vector<ScenePrimInfo> prims;
 		uint32_t cubeCount = 0;
 		uint32_t sphereCount = 0;
 		uint32_t meshCount = 0;
@@ -88,6 +96,7 @@ namespace
 		MeshGeometry geometry = {};
 		DepthTarget depth = {};
 		std::filesystem::path scenePath;
+		std::vector<ScenePrimInfo> prims;
 		uint32_t cubeCount = 0;
 		uint32_t sphereCount = 0;
 		uint32_t meshCount = 0;
@@ -95,6 +104,7 @@ namespace
 		float cameraPitch = 18.0f;
 		float cameraDistance = 6.2f;
 		bool showWireframe = false;
+		bool showHierarchy = true;
 		float smoothedFrameMs = 16.6f;
 		float smoothedFps = 60.0f;
 		bool running = true;
@@ -155,6 +165,23 @@ namespace
 		}
 
 		PlugRegistry::GetInstance().RegisterPlugins( plugInfoFiles );
+	}
+
+	uint32_t GetUsdPathDepth( const std::string& path )
+	{
+		const auto separators = static_cast<uint32_t>( std::count( path.begin(), path.end(), '/' ) );
+		return separators > 0 ? separators - 1u : 0u;
+	}
+
+	ScenePrimInfo GetPrimInfo( const UsdPrim& prim )
+	{
+		const std::string type = prim.GetTypeName().GetString();
+		return ScenePrimInfo{
+			.path = prim.GetPath().GetString(),
+			.type = type.empty() ? "typeless" : type,
+			.depth = GetUsdPathDepth( prim.GetPath().GetString() ),
+			.drawable = prim.IsA<UsdGeomCube>() || prim.IsA<UsdGeomSphere>() || prim.IsA<UsdGeomMesh>(),
+		};
 	}
 
 	XMFLOAT3 ToFloat3( const GfVec3d& value )
@@ -357,6 +384,8 @@ namespace
 		LoadedUsdScene scene;
 		for( const UsdPrim& prim : stage->Traverse() )
 		{
+			scene.prims.push_back( GetPrimInfo( prim ) );
+
 			if( prim.IsA<UsdGeomCube>() )
 			{
 				AppendUsdCube( scene, UsdGeomCube( prim ) );
@@ -618,6 +647,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		RegisterOpenUsdPlugins();
 		const LoadedUsdScene scene = LoadUsdScene( app.scenePath );
+		app.prims = scene.prims;
 		app.cubeCount = scene.cubeCount;
 		app.sphereCount = scene.sphereCount;
 		app.meshCount = scene.meshCount;
@@ -658,9 +688,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::SetNextWindowPos( ImVec2( 18.0f, 18.0f ), ImGuiCond_FirstUseEver );
 			ImGui::SetNextWindowSize( ImVec2( 390.0f, 0.0f ), ImGuiCond_FirstUseEver );
 			ImGui::Begin( "OpenUSD Static Scene" );
-			ImGui::TextWrapped( "Loads scene.usd through OpenUSD and converts supported prims into D3D12 vertex/index buffers." );
+			ImGui::TextWrapped( "This USD has no scene lights. It demonstrates composition: parent Xforms move child Cubes/Spheres before they become D3D12 buffers." );
 			ImGui::Separator();
 			ImGui::TextWrapped( "File: %s", app.scenePath.string().c_str() );
+			ImGui::Text( "USD prims: %u", static_cast<uint32_t>( app.prims.size() ) );
 			ImGui::Text( "Cubes: %u", app.cubeCount );
 			ImGui::Text( "Spheres: %u", app.sphereCount );
 			ImGui::Text( "Meshes: %u", app.meshCount );
@@ -671,6 +702,19 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::SliderFloat( "Camera yaw", &app.cameraYaw, -180.0f, 180.0f );
 			ImGui::SliderFloat( "Camera pitch", &app.cameraPitch, -70.0f, 70.0f );
 			ImGui::SliderFloat( "Camera distance", &app.cameraDistance, 2.5f, 12.0f );
+			ImGui::Separator();
+			ImGui::Checkbox( "Show USD hierarchy", &app.showHierarchy );
+			if( app.showHierarchy )
+			{
+				ImGui::BeginChild( "UsdHierarchy", ImVec2( 0.0f, 260.0f ), true );
+				for( const ScenePrimInfo& prim : app.prims )
+				{
+					ImGui::Indent( static_cast<float>( prim.depth ) * 14.0f );
+					ImGui::Text( "%s %s (%s)", prim.drawable ? "[draw]" : "[xform]", prim.path.c_str(), prim.type.c_str() );
+					ImGui::Unindent( static_cast<float>( prim.depth ) * 14.0f );
+				}
+				ImGui::EndChild();
+			}
 			ImGui::Text( "Frame: %.3f ms", app.smoothedFrameMs );
 			ImGui::Text( "FPS: %.1f", app.smoothedFps );
 			ImGui::End();

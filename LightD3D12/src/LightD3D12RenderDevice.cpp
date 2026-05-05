@@ -1,552 +1,88 @@
 #include "LightD3D12ManagerImpl.hpp"
 
+#include "LightD3D12BaseMips.hpp"
+#include "LightD3D12ShaderCompiler.hpp"
 #include "LightD3D12StagingDevice.hpp"
 #include "LightD3D12Swapchain.hpp"
 
-#include <dxcapi.h>
 #include <algorithm>
-#include <array>
-#include <cstdlib>
-#include <cstring>
-#include <cwctype>
-#include <filesystem>
-#include <fstream>
-#include <string_view>
-#include <system_error>
 #include <vector>
 
 namespace lightd3d12
 {
 	namespace
 	{
-		struct CompiledShader final
+		struct TextureCreationPlan final
 		{
-			ComPtr<ID3DBlob> d3dBlob_;
-			ComPtr<IDxcBlob> dxcBlob_;
-
-			D3D12_SHADER_BYTECODE Bytecode() const noexcept
-			{
-				if( dxcBlob_ != nullptr )
-				{
-					return { dxcBlob_->GetBufferPointer(), dxcBlob_->GetBufferSize() };
-				}
-
-				return { d3dBlob_->GetBufferPointer(), d3dBlob_->GetBufferSize() };
-			}
+			uint16_t mipLevels_ = 1;
+			bool generateInitialMipChain_ = false;
+			bool requiresTypedUavViews_ = false;
 		};
 
-		std::wstring ToWide( const char* text )
+		[[nodiscard]] uint16_t ClampTextureMipCount( uint32_t width, uint32_t height, uint16_t requestedMipCount ) noexcept
 		{
-			if( text == nullptr )
-			{
-				return {};
-			}
-
-			const int size = MultiByteToWideChar( CP_UTF8, 0, text, -1, nullptr, 0 );
-			if( size <= 0 )
-			{
-				return {};
-			}
-
-			std::wstring wide( static_cast<size_t>( size ), L'\0' );
-			MultiByteToWideChar( CP_UTF8, 0, text, -1, wide.data(), size );
-			if( !wide.empty() )
-			{
-				wide.pop_back();
-			}
-			return wide;
-		}
-
-		uint64_t StableHashString( std::string_view text ) noexcept
-		{
-			uint64_t hash = 14695981039346656037ull;
-			for( const unsigned char character : text )
-			{
-				hash ^= character;
-				hash *= 1099511628211ull;
-			}
-
-			return hash;
-		}
-
-		uint16_t CalculateFullMipCount( uint32_t width, uint32_t height ) noexcept
-		{
-			uint16_t levels = 1;
+			uint16_t maxMipCount = 1;
 			while( width > 1 || height > 1 )
 			{
 				width = std::max( 1u, width >> 1u );
 				height = std::max( 1u, height >> 1u );
-				++levels;
+				++maxMipCount;
 			}
 
-			return levels;
+			return std::clamp<uint16_t>( requestedMipCount, 1u, maxMipCount );
 		}
 
-		bool IsCpuMipGenerationSupported( DXGI_FORMAT format ) noexcept
+		[[nodiscard]] bool IsSrgbTextureFormat( DXGI_FORMAT format ) noexcept
 		{
-			return format == DXGI_FORMAT_R8G8B8A8_UNORM || format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			return format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 		}
 
-		std::vector<std::vector<uint8_t>> GenerateRgba8MipChain( const void* sourceData, uint32_t width, uint32_t height, uint32_t rowPitch, uint16_t mipLevels )
+		[[nodiscard]] bool SupportsComputeMipGeneration( const TextureDesc& desc, uint16_t mipCount ) noexcept
 		{
-			if( sourceData == nullptr || width == 0 || height == 0 || rowPitch < width * 4u )
-			{
-				throw std::runtime_error( "Invalid texture data for CPU mip generation." );
-			}
-
-			std::vector<std::vector<uint8_t>> mipChain;
-			mipChain.reserve( mipLevels );
-			mipChain.emplace_back( static_cast<size_t>( width ) * height * 4u );
-
-			const auto* sourceBytes = static_cast<const uint8_t*>( sourceData );
-			for( uint32_t y = 0; y < height; ++y )
-			{
-				std::memcpy( mipChain.front().data() + static_cast<size_t>( y ) * width * 4u, sourceBytes + static_cast<size_t>( y ) * rowPitch, static_cast<size_t>( width ) * 4u );
-			}
-
-			uint32_t previousWidth = width;
-			uint32_t previousHeight = height;
-			for( uint16_t level = 1; level < mipLevels; ++level )
-			{
-				const uint32_t mipWidth = std::max( 1u, previousWidth / 2u );
-				const uint32_t mipHeight = std::max( 1u, previousHeight / 2u );
-				const std::vector<uint8_t>& previousMip = mipChain.back();
-				std::vector<uint8_t>& currentMip = mipChain.emplace_back( static_cast<size_t>( mipWidth ) * mipHeight * 4u );
-
-				for( uint32_t y = 0; y < mipHeight; ++y )
-				{
-					for( uint32_t x = 0; x < mipWidth; ++x )
-					{
-						uint32_t accumulated[ 4 ]{};
-						uint32_t sampleCount = 0;
-
-						for( uint32_t offsetY = 0; offsetY < 2; ++offsetY )
-						{
-							const uint32_t sourceY = std::min( previousHeight - 1u, y * 2u + offsetY );
-							for( uint32_t offsetX = 0; offsetX < 2; ++offsetX )
-							{
-								const uint32_t sourceX = std::min( previousWidth - 1u, x * 2u + offsetX );
-								const uint8_t* texel = previousMip.data() + ( static_cast<size_t>( sourceY ) * previousWidth + sourceX ) * 4u;
-								accumulated[ 0 ] += texel[ 0 ];
-								accumulated[ 1 ] += texel[ 1 ];
-								accumulated[ 2 ] += texel[ 2 ];
-								accumulated[ 3 ] += texel[ 3 ];
-								++sampleCount;
-							}
-						}
-
-						uint8_t* output = currentMip.data() + ( static_cast<size_t>( y ) * mipWidth + x ) * 4u;
-						output[ 0 ] = static_cast<uint8_t>( accumulated[ 0 ] / sampleCount );
-						output[ 1 ] = static_cast<uint8_t>( accumulated[ 1 ] / sampleCount );
-						output[ 2 ] = static_cast<uint8_t>( accumulated[ 2 ] / sampleCount );
-						output[ 3 ] = static_cast<uint8_t>( accumulated[ 3 ] / sampleCount );
-					}
-				}
-
-				previousWidth = mipWidth;
-				previousHeight = mipHeight;
-			}
-
-			return mipChain;
+			return mipCount > 1 &&
+				desc.data != nullptr &&
+				desc.dimension == TextureDimension::Texture2D &&
+				desc.depthOrArraySize == 1 &&
+				( desc.format == DXGI_FORMAT_R8G8B8A8_UNORM || desc.format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB );
 		}
 
-		std::vector<StagingDevice::TextureSubresourceUpload> BuildMipUploads( const std::vector<std::vector<uint8_t>>& mipChain, uint32_t width, uint32_t height )
+		TextureCreationPlan BuildTextureCreationPlan( const TextureDesc& desc )
 		{
-			std::vector<StagingDevice::TextureSubresourceUpload> uploads;
-			uploads.reserve( mipChain.size() );
+			TextureCreationPlan plan{};
+			const uint16_t requestedMipLevels = std::max<uint16_t>( 1u, desc.countMipMap );
+			plan.mipLevels_ = ClampTextureMipCount( desc.width, desc.height, requestedMipLevels );
+			plan.generateInitialMipChain_ = SupportsComputeMipGeneration( desc, plan.mipLevels_ );
+			plan.requiresTypedUavViews_ = HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) || plan.generateInitialMipChain_;
 
-			uint32_t mipWidth = width;
-			uint32_t mipHeight = height;
-			for( const std::vector<uint8_t>& mipData : mipChain )
+			if( requestedMipLevels > 1u && desc.data != nullptr && !plan.generateInitialMipChain_ )
 			{
-				uploads.push_back( StagingDevice::TextureSubresourceUpload{
-					.data = mipData.data(),
-					.rowPitch = mipWidth * 4u,
-					.slicePitch = static_cast<uint32_t>( mipData.size() ),
-				} );
-
-				mipWidth = std::max( 1u, mipWidth / 2u );
-				mipHeight = std::max( 1u, mipHeight / 2u );
-				( void )mipHeight;
+				throw std::runtime_error( "Compute mip generation currently supports only single Texture2D RGBA8 textures." );
 			}
 
-			return uploads;
+			return plan;
 		}
 
-		std::wstring SanitizeFileName( std::wstring text )
+		[[nodiscard]] DXGI_FORMAT ResolveTypedUavCompatibleResourceFormat( DXGI_FORMAT format, bool requiresTypedUavViews ) noexcept
 		{
-			for( wchar_t& character : text )
+			if( requiresTypedUavViews && IsSrgbTextureFormat( format ) )
 			{
-				switch( character )
-				{
-					case L'\\':
-					case L'/':
-					case L':':
-					case L'*':
-					case L'?':
-					case L'"':
-					case L'<':
-					case L'>':
-					case L'|':
-					case L' ':
-						character = L'_';
-						break;
-
-					default:
-						break;
-				}
+				return DXGI_FORMAT_R8G8B8A8_TYPELESS;
 			}
 
-			return text;
+			return format;
 		}
 
-		std::filesystem::path GetShaderDebugOutputDirectory()
+		[[nodiscard]] DXGI_FORMAT ResolveTextureUavFormat( DXGI_FORMAT format ) noexcept
 		{
-			std::array<wchar_t, MAX_PATH> modulePath{};
-			const DWORD length = GetModuleFileNameW( nullptr, modulePath.data(), static_cast<DWORD>( modulePath.size() ) );
-			if( length == 0 )
+			if( IsSrgbTextureFormat( format ) )
 			{
-				return std::filesystem::current_path() / "ShaderPdbs";
+				return DXGI_FORMAT_R8G8B8A8_UNORM;
 			}
 
-			return std::filesystem::path( modulePath.data(), modulePath.data() + length ).parent_path() / "ShaderPdbs";
+			return format;
 		}
 
-		void WriteBlobToFile( const std::filesystem::path& path, IDxcBlob* blob )
-		{
-			if( blob == nullptr )
-			{
-				return;
-			}
-
-			std::filesystem::create_directories( path.parent_path() );
-			std::ofstream file( path, std::ios::binary | std::ios::trunc );
-			if( !file )
-			{
-				throw std::runtime_error( "Failed to open shader PDB output file." );
-			}
-
-			file.write( reinterpret_cast<const char*>( blob->GetBufferPointer() ), static_cast<std::streamsize>( blob->GetBufferSize() ) );
-			if( !file )
-			{
-				throw std::runtime_error( "Failed to write shader PDB output file." );
-			}
-		}
-
-		std::filesystem::path GetExecutableDirectory()
-		{
-			std::array<wchar_t, MAX_PATH> modulePath{};
-			const DWORD length = GetModuleFileNameW( nullptr, modulePath.data(), static_cast<DWORD>( modulePath.size() ) );
-			if( length == 0 )
-			{
-				return std::filesystem::current_path();
-			}
-
-			return std::filesystem::path( modulePath.data(), modulePath.data() + length ).parent_path();
-		}
-
-		std::wstring ToLowerAscii( std::wstring text )
-		{
-			std::transform( text.begin(), text.end(), text.begin(), []( wchar_t character )
-				{
-					return static_cast<wchar_t>( towlower( character ) );
-				} );
-			return text;
-		}
-
-		bool IsBlockedDxCompilerPath( const std::filesystem::path& path )
-		{
-			const std::wstring normalized = ToLowerAscii( path.wstring() );
-			return normalized.find( L"\\renderdoc\\plugins\\d3d12\\dxcompiler.dll" ) != std::wstring::npos ||
-				normalized.find( L"\\bravesoftware\\brave-browser\\" ) != std::wstring::npos;
-		}
-
-		bool HasSiblingDxil( const std::filesystem::path& compilerPath )
-		{
-			std::error_code error;
-			return std::filesystem::exists( compilerPath.parent_path() / "dxil.dll", error );
-		}
-
-		std::vector<uint32_t> ParseDottedVersion( std::wstring_view versionText )
-		{
-			std::vector<uint32_t> parts;
-			uint32_t current = 0;
-			bool hasDigits = false;
-
-			for( const wchar_t character : versionText )
-			{
-				if( character >= L'0' && character <= L'9' )
-				{
-					hasDigits = true;
-					current = current * 10u + static_cast<uint32_t>( character - L'0' );
-					continue;
-				}
-
-				if( character == L'.' )
-				{
-					parts.push_back( hasDigits ? current : 0u );
-					current = 0;
-					hasDigits = false;
-					continue;
-				}
-
-				return {};
-			}
-
-			if( hasDigits )
-			{
-				parts.push_back( current );
-			}
-
-			return parts;
-		}
-
-		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
-		{
-			const size_t partCount = std::max( left.size(), right.size() );
-			for( size_t index = 0; index < partCount; ++index )
-			{
-				const uint32_t leftPart = index < left.size() ? left[ index ] : 0u;
-				const uint32_t rightPart = index < right.size() ? right[ index ] : 0u;
-				if( leftPart != rightPart )
-				{
-					return leftPart > rightPart;
-				}
-			}
-
-			return false;
-		}
-
-		std::filesystem::path FindLatestWindowsSdkDxCompiler()
-		{
-			wchar_t* programFilesX86Raw = nullptr;
-			size_t programFilesX86Length = 0;
-			if( _wdupenv_s( &programFilesX86Raw, &programFilesX86Length, L"ProgramFiles(x86)" ) != 0 || programFilesX86Raw == nullptr )
-			{
-				return {};
-			}
-			const std::filesystem::path programFilesX86Path( programFilesX86Raw );
-			free( programFilesX86Raw );
-
-			const std::filesystem::path sdkBinDirectory = programFilesX86Path / "Windows Kits" / "10" / "bin";
-			std::error_code error;
-			if( !std::filesystem::exists( sdkBinDirectory, error ) )
-			{
-				return {};
-			}
-
-			std::filesystem::path bestCompilerPath;
-			std::vector<uint32_t> bestVersionParts;
-			for( const auto& entry : std::filesystem::directory_iterator( sdkBinDirectory, error ) )
-			{
-				if( error || !entry.is_directory( error ) )
-				{
-					continue;
-				}
-
-				const std::vector<uint32_t> versionParts = ParseDottedVersion( entry.path().filename().wstring() );
-				if( versionParts.empty() )
-				{
-					continue;
-				}
-
-				const std::filesystem::path candidateCompiler = entry.path() / "x64" / "dxcompiler.dll";
-				if( !HasSiblingDxil( candidateCompiler ) )
-				{
-					continue;
-				}
-
-				if( bestCompilerPath.empty() || IsVersionGreater( versionParts, bestVersionParts ) )
-				{
-					bestCompilerPath = candidateCompiler;
-					bestVersionParts = versionParts;
-				}
-			}
-
-			return bestCompilerPath;
-		}
-
-		HMODULE TryLoadDxCompilerFromPath( const std::filesystem::path& candidate )
-		{
-			std::error_code error;
-			if( !std::filesystem::exists( candidate, error ) || IsBlockedDxCompilerPath( candidate ) )
-			{
-				return nullptr;
-			}
-
-			if( !HasSiblingDxil( candidate ) )
-			{
-				return nullptr;
-			}
-
-			return LoadLibraryExW(
-				candidate.c_str(),
-				nullptr,
-				LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 );
-		}
-
-		HMODULE LoadDxCompilerModule()
-		{
-			const std::filesystem::path executableDirectory = GetExecutableDirectory();
-			const std::filesystem::path currentDirectory = std::filesystem::current_path();
-			const std::filesystem::path sdkCompiler = FindLatestWindowsSdkDxCompiler();
-
-			std::vector<std::filesystem::path> candidates;
-			candidates.reserve( 3 );
-			candidates.push_back( executableDirectory / "dxcompiler.dll" );
-			if( currentDirectory != executableDirectory )
-			{
-				candidates.push_back( currentDirectory / "dxcompiler.dll" );
-			}
-			if( !sdkCompiler.empty() )
-			{
-				candidates.push_back( sdkCompiler );
-			}
-
-			for( const auto& candidate : candidates )
-			{
-				if( HMODULE module = TryLoadDxCompilerFromPath( candidate ); module != nullptr )
-				{
-					return module;
-				}
-			}
-
-			HMODULE module = LoadLibraryExW(
-				L"dxcompiler.dll",
-				nullptr,
-				LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS );
-			if( module != nullptr )
-			{
-				std::array<wchar_t, MAX_PATH> loadedPath{};
-				const DWORD length = GetModuleFileNameW( module, loadedPath.data(), static_cast<DWORD>( loadedPath.size() ) );
-				if( length == 0 )
-				{
-					FreeLibrary( module );
-					return nullptr;
-				}
-
-				const std::filesystem::path loadedModulePath( loadedPath.data(), loadedPath.data() + length );
-				if( IsBlockedDxCompilerPath( loadedModulePath ) || !HasSiblingDxil( loadedModulePath ) )
-				{
-					FreeLibrary( module );
-					return nullptr;
-				}
-			}
-
-			return module;
-		}
-
-		DxcCreateInstanceProc LoadDxcCreateInstance()
-		{
-			static DxcCreateInstanceProc ourCreateInstance = []() -> DxcCreateInstanceProc
-				{
-					HMODULE module = LoadDxCompilerModule();
-					if( module == nullptr )
-					{
-						return nullptr;
-					}
-
-					return reinterpret_cast<DxcCreateInstanceProc>( GetProcAddress( module, "DxcCreateInstance" ) );
-				}();
-
-			if( ourCreateInstance == nullptr )
-			{
-				throw std::runtime_error( "Failed to locate dxcompiler.dll for DXC shader compilation." );
-			}
-
-			return ourCreateInstance;
-		}
-
-		CompiledShader CompileShader( const ShaderStageSource& stage, const char* defaultProfile )
-		{
-			const char* profile = stage.profile != nullptr ? stage.profile : defaultProfile;
-			if( stage.source == nullptr || profile == nullptr )
-			{
-				throw std::runtime_error( "Shader source or profile is invalid." );
-			}
-
-			const auto createInstance = LoadDxcCreateInstance();
-
-			ComPtr<IDxcUtils> utils;
-			ComPtr<IDxcCompiler3> compiler;
-			detail::ThrowIfFailed( createInstance( CLSID_DxcUtils, __uuidof( IDxcUtils ), reinterpret_cast<void**>( utils.GetAddressOf() ) ), "Failed to create IDxcUtils." );
-			detail::ThrowIfFailed( createInstance( CLSID_DxcCompiler, __uuidof( IDxcCompiler3 ), reinterpret_cast<void**>( compiler.GetAddressOf() ) ), "Failed to create IDxcCompiler3." );
-
-			ComPtr<IDxcIncludeHandler> includeHandler;
-			detail::ThrowIfFailed( utils->CreateDefaultIncludeHandler( includeHandler.GetAddressOf() ), "Failed to create DXC include handler." );
-
-			const std::wstring entryPoint = ToWide( stage.entryPoint != nullptr ? stage.entryPoint : "main" );
-			const std::wstring targetProfile = ToWide( profile );
-			const std::wstring sanitizedEntryPoint = SanitizeFileName( entryPoint );
-			const std::wstring sanitizedProfile = SanitizeFileName( targetProfile );
-			const uint64_t shaderHash = StableHashString( std::string_view( stage.source, std::strlen( stage.source ) ) ) ^
-				StableHashString( std::string_view( stage.entryPoint != nullptr ? stage.entryPoint : "main" ) ) ^
-				StableHashString( std::string_view( profile ) );
-			const std::filesystem::path shaderDebugDirectory = GetShaderDebugOutputDirectory();
-			const std::filesystem::path pdbPath =
-				shaderDebugDirectory /
-				( sanitizedEntryPoint + L"_" + sanitizedProfile + L"_" + std::to_wstring( shaderHash ) + L".pdb" );
-			const std::wstring pdbPathWide = pdbPath.wstring();
-
-			std::array<LPCWSTR, 12> arguments = {
-				L"-E",
-				entryPoint.c_str(),
-				L"-T",
-				targetProfile.c_str(),
-				L"-HV",
-				L"2021",
-				DXC_ARG_WARNINGS_ARE_ERRORS,
-				DXC_ARG_PACK_MATRIX_ROW_MAJOR,
-				L"-Zi",
-				L"-Fd",
-				pdbPathWide.c_str(),
-				DXC_ARG_DEBUG,
-			};
-
-			DxcBuffer sourceBuffer{};
-			sourceBuffer.Ptr = stage.source;
-			sourceBuffer.Size = std::strlen( stage.source );
-			sourceBuffer.Encoding = DXC_CP_UTF8;
-
-			ComPtr<IDxcResult> result;
-			detail::ThrowIfFailed(
-				compiler->Compile(
-					&sourceBuffer,
-					arguments.data(),
-					static_cast<UINT32>( arguments.size() ),
-					includeHandler.Get(),
-					__uuidof( IDxcResult ),
-					reinterpret_cast<void**>( result.GetAddressOf() ) ),
-				"Failed to invoke DXC shader compilation." );
-
-			HRESULT status = S_OK;
-			detail::ThrowIfFailed( result->GetStatus( &status ), "Failed to query DXC compilation status." );
-			if( FAILED( status ) )
-			{
-				ComPtr<IDxcBlobUtf8> errors;
-				if( SUCCEEDED( result->GetOutput( DXC_OUT_ERRORS, __uuidof( IDxcBlobUtf8 ), reinterpret_cast<void**>( errors.GetAddressOf() ), nullptr ) ) && errors != nullptr && errors->GetStringLength() > 0 )
-				{
-					throw std::runtime_error( errors->GetStringPointer() );
-				}
-
-				throw std::runtime_error( "Failed to compile shader with DXC." );
-			}
-
-			CompiledShader compiledShader;
-			detail::ThrowIfFailed(
-				result->GetOutput( DXC_OUT_OBJECT, __uuidof( IDxcBlob ), reinterpret_cast<void**>( compiledShader.dxcBlob_.GetAddressOf() ), nullptr ),
-				"Failed to retrieve DXC shader bytecode." );
-
-			ComPtr<IDxcBlob> pdbBlob;
-			if( SUCCEEDED( result->GetOutput( DXC_OUT_PDB, __uuidof( IDxcBlob ), reinterpret_cast<void**>( pdbBlob.GetAddressOf() ), nullptr ) ) && pdbBlob != nullptr )
-			{
-				WriteBlobToFile( pdbPath, pdbBlob.Get() );
-			}
-
-			return compiledShader;
-		}
-
-		TextureResource::ResolvedFormats ResolveTextureFormats( const TextureDesc& desc )
+		TextureResource::ResolvedFormats ResolveTextureFormats( const TextureDesc& desc, bool requiresTypedUavViews )
 		{
 			TextureResource::ResolvedFormats formats{};
 			formats.resource_ = desc.format;
@@ -554,7 +90,7 @@ namespace lightd3d12
 			const bool sampled = HasTextureUsage( desc.usage, TextureUsage::Sampled );
 			const bool renderTarget = HasTextureUsage( desc.usage, TextureUsage::RenderTarget );
 			const bool depthStencil = HasTextureUsage( desc.usage, TextureUsage::DepthStencil );
-			const bool unorderedAccess = HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess );
+			const bool unorderedAccess = HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) || requiresTypedUavViews;
 
 			if( depthStencil )
 			{
@@ -591,13 +127,18 @@ namespace lightd3d12
 				return formats;
 			}
 
+			if( unorderedAccess )
+			{
+				formats.resource_ = ResolveTypedUavCompatibleResourceFormat( desc.format, requiresTypedUavViews );
+			}
+
 			formats.srv_ = sampled ? desc.format : DXGI_FORMAT_UNKNOWN;
 			formats.rtv_ = renderTarget ? desc.format : DXGI_FORMAT_UNKNOWN;
-			formats.uav_ = unorderedAccess ? desc.format : DXGI_FORMAT_UNKNOWN;
+			formats.uav_ = unorderedAccess ? ResolveTextureUavFormat( desc.format ) : DXGI_FORMAT_UNKNOWN;
 			return formats;
 		}
 
-		D3D12_RESOURCE_FLAGS ResolveTextureResourceFlags( TextureUsage usage ) noexcept
+		D3D12_RESOURCE_FLAGS ResolveTextureResourceFlags( TextureUsage usage, bool requiresTypedUavViews ) noexcept
 		{
 			D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
 			if( HasTextureUsage( usage, TextureUsage::RenderTarget ) )
@@ -610,7 +151,7 @@ namespace lightd3d12
 				flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 			}
 
-			if( HasTextureUsage( usage, TextureUsage::UnorderedAccess ) )
+			if( HasTextureUsage( usage, TextureUsage::UnorderedAccess ) || requiresTypedUavViews )
 			{
 				flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 			}
@@ -938,21 +479,7 @@ namespace lightd3d12
 			throw std::runtime_error( "DepthStencil textures cannot expose UAVs." );
 		}
 
-		const uint16_t requestedMipLevels = std::max<uint16_t>( 1, desc.mipLevels );
-		const uint16_t actualMipLevels = desc.mipsEnabled ? CalculateFullMipCount( desc.width, desc.height ) : requestedMipLevels;
-
-		if( desc.mipsEnabled )
-		{
-			if( desc.dimension != TextureDimension::Texture2D || desc.depthOrArraySize != 1 )
-			{
-				throw std::runtime_error( "CPU mip generation currently supports only single Texture2D resources." );
-			}
-
-			if( !IsCpuMipGenerationSupported( desc.format ) )
-			{
-				throw std::runtime_error( "CPU mip generation currently supports only R8G8B8A8 textures." );
-			}
-		}
+		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
 
 		if( desc.dimension == TextureDimension::Texture3D )
 		{
@@ -975,14 +502,20 @@ namespace lightd3d12
 		TextureResource resource;
 		resource.width_ = desc.width;
 		resource.height_ = desc.height;
+		resource.mipLevels_ = creationPlan.mipLevels_;
 		resource.depthOrArraySize_ = desc.depthOrArraySize;
 		resource.dimension_ = desc.dimension;
 		resource.format_ = desc.format;
-		resource.formats_ = ResolveTextureFormats( desc );
-		resource.usageFlags_ = ResolveTextureResourceFlags( desc.usage );
+		resource.formats_ = ResolveTextureFormats( desc, creationPlan.requiresTypedUavViews_ );
+		resource.usageFlags_ = ResolveTextureResourceFlags( desc.usage, creationPlan.requiresTypedUavViews_ );
 		resource.currentState_ = desc.initialState;
 		resource.isDepthFormat_ = TextureResource::IsDepthFormat( resource.formats_.dsv_ );
 		resource.isStencilFormat_ = TextureResource::IsDepthStencilFormat( resource.formats_.dsv_ );
+
+		if( creationPlan.requiresTypedUavViews_ && resource.formats_.uav_ == DXGI_FORMAT_UNKNOWN )
+		{
+			throw std::runtime_error( "This texture format cannot expose the typed UAVs required by the requested usage." );
+		}
 
 		if( desc.dimension == TextureDimension::Texture3D )
 		{
@@ -991,7 +524,7 @@ namespace lightd3d12
 				desc.width,
 				desc.height,
 				desc.depthOrArraySize,
-				actualMipLevels,
+				resource.mipLevels_,
 				resource.usageFlags_ );
 		}
 		else
@@ -1001,7 +534,7 @@ namespace lightd3d12
 				desc.width,
 				desc.height,
 				desc.depthOrArraySize,
-				actualMipLevels,
+				resource.mipLevels_,
 				1,
 				0,
 				resource.usageFlags_ );
@@ -1019,6 +552,13 @@ namespace lightd3d12
 				IID_PPV_ARGS( resource.resource_.GetAddressOf() ) ),
 			"Failed to create texture resource." );
 
+		const auto makeBindlessCpuHandle = [ &impl ]( uint32_t index )
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
+			handle.ptr += static_cast<SIZE_T>( index ) * impl.bindlessDescriptorSize_;
+			return handle;
+		};
+
 		if( HasTextureUsage( desc.usage, TextureUsage::Sampled ) )
 		{
 			resource.srvIndex_ = impl.AllocateBindlessDescriptor();
@@ -1031,21 +571,39 @@ namespace lightd3d12
 			if( desc.dimension == TextureDimension::Texture3D )
 			{
 				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-				srvDesc.Texture3D.MipLevels = actualMipLevels;
+				srvDesc.Texture3D.MipLevels = resource.mipLevels_;
 			}
 			else
 			{
 				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srvDesc.Texture2D.MipLevels = actualMipLevels;
+				srvDesc.Texture2D.MipLevels = resource.mipLevels_;
 			}
 			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
+		}
+
+		if( creationPlan.generateInitialMipChain_ )
+		{
+			resource.baseMipsUavCount_ = static_cast<uint16_t>( resource.mipLevels_ - 1u );
+			resource.baseMipsUavBaseIndex_ = impl.AllocateBindlessDescriptorRange( resource.baseMipsUavCount_ );
+			for( uint16_t mipLevel = 1; mipLevel < resource.mipLevels_; ++mipLevel )
+			{
+				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+				uavDesc.Format = resource.formats_.uav_;
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+				uavDesc.Texture2D.MipSlice = mipLevel;
+
+				impl.device_->CreateUnorderedAccessView(
+					resource.resource_.Get(),
+					nullptr,
+					&uavDesc,
+					makeBindlessCpuHandle( resource.baseMipsUavBaseIndex_ + static_cast<uint32_t>( mipLevel - 1u ) ) );
+			}
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
 		{
 			resource.uavIndex_ = impl.AllocateBindlessDescriptor();
-			resource.uavHandle_ = impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.uavHandle_.ptr += static_cast<SIZE_T>( resource.uavIndex_ ) * impl.bindlessDescriptorSize_;
+			resource.uavHandle_ = makeBindlessCpuHandle( resource.uavIndex_ );
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
 			uavDesc.Format = resource.formats_.uav_;
@@ -1083,15 +641,10 @@ namespace lightd3d12
 		if( desc.data != nullptr && desc.rowPitch > 0 && desc.slicePitch > 0 )
 		{
 			TextureResource& textureResource = impl.GetTextureResource( handle );
-			if( desc.mipsEnabled )
+			impl.stagingDevice_->TextureSubData2D( textureResource, desc.data, desc.rowPitch, desc.slicePitch );
+			if( creationPlan.generateInitialMipChain_ )
 			{
-				std::vector<std::vector<uint8_t>> mipChain = GenerateRgba8MipChain( desc.data, desc.width, desc.height, desc.rowPitch, actualMipLevels );
-				const std::vector<StagingDevice::TextureSubresourceUpload> uploads = BuildMipUploads( mipChain, desc.width, desc.height );
-				impl.stagingDevice_->TextureSubData2D( textureResource, uploads.data(), static_cast<uint32_t>( uploads.size() ) );
-			}
-			else
-			{
-				impl.stagingDevice_->TextureSubData2D( textureResource, desc.data, desc.rowPitch, desc.slicePitch );
+				impl.baseMips_->Generate( textureResource, desc.initialState );
 			}
 		}
 
@@ -1164,6 +717,7 @@ namespace lightd3d12
 
 		impl.FreeBindlessDescriptor( resource->srvIndex_ );
 		impl.FreeBindlessDescriptor( resource->uavIndex_ );
+		impl.FreeBindlessDescriptorRange( resource->baseMipsUavBaseIndex_, resource->baseMipsUavCount_ );
 		impl.FreeRtvDescriptor( resource->rtvIndex_ );
 		impl.FreeDsvDescriptor( resource->dsvIndex_ );
 		resource->resource_.Reset();

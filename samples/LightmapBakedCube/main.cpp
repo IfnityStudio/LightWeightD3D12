@@ -199,11 +199,24 @@ namespace
 
 	TextureHandle CreateTextureFromImage( RenderDevice& ctx, const LoadedImage& image, const char* debugName, bool mipsEnabled )
 	{
+		uint16_t mipCount = 1;
+		if( mipsEnabled )
+		{
+			uint32_t width = image.width;
+			uint32_t height = image.height;
+			while( width > 1 || height > 1 )
+			{
+				width = std::max( 1u, width >> 1u );
+				height = std::max( 1u, height >> 1u );
+				++mipCount;
+			}
+		}
+
 		TextureDesc desc{};
 		desc.debugName = debugName;
 		desc.width = image.width;
 		desc.height = image.height;
-		desc.mipsEnabled = mipsEnabled;
+		desc.countMipMap = mipCount;
 		desc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.usage = TextureUsage::Sampled;
 		desc.data = image.pixels.data();

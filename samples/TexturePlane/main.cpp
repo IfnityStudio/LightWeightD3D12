@@ -195,7 +195,7 @@ namespace
 		textureDesc.debugName = "TexturePlane Marble Texture";
 		textureDesc.width = image.width;
 		textureDesc.height = image.height;
-		textureDesc.mipsEnabled = true;
+		textureDesc.countMipMap = static_cast<uint16_t>( app.mipCount );
 		textureDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		textureDesc.usage = TextureUsage::Sampled;
 		textureDesc.data = image.pixels.data();
@@ -340,7 +340,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		HWND hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
-			L"LightD3D12 Texture Plane + CPU Mips",
+			L"LightD3D12 Texture Plane + Compute Mips",
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -416,7 +416,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::SetNextWindowPos( ImVec2( 18.0f, 18.0f ), ImGuiCond_FirstUseEver );
 			ImGui::SetNextWindowSize( ImVec2( 430.0f, 0.0f ), ImGuiCond_FirstUseEver );
 			ImGui::Begin( "Texture Plane" );
-			ImGui::TextWrapped( "A simple textured plane inspired by the Vulkan texture sample. LightD3D12 creates every mip level on the CPU when mipsEnabled is true." );
+			ImGui::TextWrapped( "A simple textured plane inspired by the Vulkan texture sample. LightD3D12 uploads mip 0 and builds the remaining mip chain in a compute shader when countMipMap is greater than 1." );
 			ImGui::Separator();
 			ImGui::Text( "Texture: %u x %u", app.textureWidth, app.textureHeight );
 			ImGui::Text( "Mip levels: %u", app.mipCount );

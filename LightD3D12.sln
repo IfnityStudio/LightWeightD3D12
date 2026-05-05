@@ -40,9 +40,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GlobeMap", "samples\GlobeMa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TexturePlane", "samples\TexturePlane\TexturePlane.vcxproj", "{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RayMarchingGuide", "samples\RayMarchingGuide\RayMarchingGuide.vcxproj", "{36CAB969-E220-42B5-8039-5D7FF289438B}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UsdStaticScene", "samples\UsdStaticScene\UsdStaticScene.vcxproj", "{D4E4F09A-C83F-451F-A28E-07B56872D7AA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightmapBakedCube", "samples\LightmapBakedCube\LightmapBakedCube.vcxproj", "{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnvironmentImgui", "samples\EnvironmentImgui\EnvironmentImgui.vcxproj", "{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12WpfNative", "bindings\LightD3D12WpfNative\LightD3D12WpfNative.vcxproj", "{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}"
 EndProject
@@ -139,6 +143,10 @@ Global
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Debug|x64.Build.0 = Debug|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.ActiveCfg = Release|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.Build.0 = Release|x64
+		{36CAB969-E220-42B5-8039-5D7FF289438B}.Debug|x64.ActiveCfg = Debug|x64
+		{36CAB969-E220-42B5-8039-5D7FF289438B}.Debug|x64.Build.0 = Debug|x64
+		{36CAB969-E220-42B5-8039-5D7FF289438B}.Release|x64.ActiveCfg = Release|x64
+		{36CAB969-E220-42B5-8039-5D7FF289438B}.Release|x64.Build.0 = Release|x64
 		{D4E4F09A-C83F-451F-A28E-07B56872D7AA}.Debug|x64.ActiveCfg = Debug|x64
 		{D4E4F09A-C83F-451F-A28E-07B56872D7AA}.Debug|x64.Build.0 = Debug|x64
 		{D4E4F09A-C83F-451F-A28E-07B56872D7AA}.Release|x64.ActiveCfg = Release|x64
@@ -147,6 +155,10 @@ Global
 		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Debug|x64.Build.0 = Debug|x64
 		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Release|x64.ActiveCfg = Release|x64
 		{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}.Release|x64.Build.0 = Release|x64
+		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Debug|x64.ActiveCfg = Debug|x64
+		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Debug|x64.Build.0 = Debug|x64
+		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Release|x64.ActiveCfg = Release|x64
+		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Release|x64.Build.0 = Release|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.ActiveCfg = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.Build.0 = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Release|x64.ActiveCfg = Release|x64

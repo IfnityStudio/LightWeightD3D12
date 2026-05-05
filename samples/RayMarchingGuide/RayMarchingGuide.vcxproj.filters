@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{6307D3B3-9D17-42CB-84DE-4E33A59B1849}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shader Files">
+      <UniqueIdentifier>{D7679266-74B5-498E-A3E2-A6A65D6E020A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Docs">
+      <UniqueIdentifier>{29E29B90-EEBA-4E46-8DE4-D1580C5A1329}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\RayMarchingGuideVS.hlsl">
+      <Filter>Shader Files</Filter>
+    </None>
+    <None Include="shaders\RayMarchingGuidePS.hlsl">
+      <Filter>Shader Files</Filter>
+    </None>
+    <None Include="README.md">
+      <Filter>Docs</Filter>
+    </None>
+  </ItemGroup>
+</Project>

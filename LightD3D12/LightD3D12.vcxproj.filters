@@ -33,10 +33,18 @@
     <ClInclude Include="src\LightD3D12ManagerImpl.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\LightD3D12BaseMips.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\LightD3D12ShaderCompiler.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\LightD3D12Swapchain.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\LightD3D12\LightD3D12Imgui.hpp" />
+    <ClInclude Include="include\LightD3D12\LightAssimpImporter.hpp" />
+    <ClInclude Include="include\LightD3D12\LightHLSLLoader.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\LightD3D12Resources.cpp">
@@ -57,6 +65,12 @@
     <ClCompile Include="src\LightD3D12DeviceManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\LightD3D12ShaderCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\LightD3D12BaseMips.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\LightD3D12RenderDevice.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -67,5 +81,13 @@
     <ClCompile Include="..\third_party\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\third_party\imgui\backends\imgui_impl_dx12.cpp" />
     <ClCompile Include="..\third_party\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="src\LightAssimpImporter.cpp" />
+    <ClCompile Include="src\LightHLSLLoader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClassDiagram.cd" />
+    <None Include="src\shaders\LightD3D12BaseMipsCS.hlsl">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

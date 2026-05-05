@@ -26,7 +26,13 @@ set(ourPrivateHeaders
     "${ourLibraryRoot}/src/LightD3D12CommandBuffer.hpp"
     "${ourLibraryRoot}/src/LightD3D12StagingDevice.hpp"
     "${ourLibraryRoot}/src/LightD3D12ManagerImpl.hpp"
+    "${ourLibraryRoot}/src/LightD3D12BaseMips.hpp"
+    "${ourLibraryRoot}/src/LightD3D12ShaderCompiler.hpp"
     "${ourLibraryRoot}/src/LightD3D12Swapchain.hpp"
+)
+
+set(ourLibraryShaderFiles
+    "${ourLibraryRoot}/src/shaders/LightD3D12BaseMipsCS.hlsl"
 )
 
 set(ourLibrarySources
@@ -35,6 +41,8 @@ set(ourLibrarySources
     "${ourLibraryRoot}/src/LightD3D12CommandBuffer.cpp"
     "${ourLibraryRoot}/src/LightD3D12StagingDevice.cpp"
     "${ourLibraryRoot}/src/LightD3D12Swapchain.cpp"
+    "${ourLibraryRoot}/src/LightD3D12ShaderCompiler.cpp"
+    "${ourLibraryRoot}/src/LightD3D12BaseMips.cpp"
     "${ourLibraryRoot}/src/LightD3D12DeviceManager.cpp"
     "${ourLibraryRoot}/src/LightD3D12RenderDevice.cpp"
     "${ourLibraryRoot}/src/LightD3D12Imgui.cpp"
@@ -64,6 +72,7 @@ set(ourImguiHeaders
 add_library(LightD3D12 STATIC
     ${ourPublicHeaders}
     ${ourPrivateHeaders}
+    ${ourLibraryShaderFiles}
     ${ourLibrarySources}
     ${ourImguiHeaders}
     ${ourImguiSources}
@@ -166,6 +175,14 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlaneVS.hlsl"
     )
 
+    ourAddSample(
+        LightD3D12RayMarchingGuide
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/main.cpp"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/README.md"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuidePS.hlsl"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuideVS.hlsl"
+    )
+
     target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12GlobeMap PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12TexturePlane PRIVATE windowscodecs ole32)
@@ -176,6 +193,7 @@ endif()
 source_group(TREE "${ourLightD3D12Root}" FILES
     ${ourPublicHeaders}
     ${ourPrivateHeaders}
+    ${ourLibraryShaderFiles}
     ${ourLibrarySources}
     ${ourImguiHeaders}
     ${ourImguiSources}
@@ -198,5 +216,9 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/TexturePlane/main.cpp"
         "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlanePS.hlsl"
         "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlaneVS.hlsl"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/main.cpp"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/README.md"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuidePS.hlsl"
+        "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuideVS.hlsl"
     )
 endif()

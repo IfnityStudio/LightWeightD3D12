@@ -84,9 +84,12 @@ namespace lightd3d12
 		uint32_t dsvIndex_ = UINT32_MAX;
 		uint32_t srvIndex_ = UINT32_MAX;
 		uint32_t uavIndex_ = UINT32_MAX;
+		uint32_t baseMipsUavBaseIndex_ = UINT32_MAX;
 		uint32_t width_ = 0;
 		uint32_t height_ = 0;
+		uint16_t mipLevels_ = 1;
 		uint16_t depthOrArraySize_ = 1;
+		uint16_t baseMipsUavCount_ = 0;
 		TextureDimension dimension_ = TextureDimension::Texture2D;
 		bool isDepthFormat_ = false;
 		bool isStencilFormat_ = false;
