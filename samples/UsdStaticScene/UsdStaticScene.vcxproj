@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{D4E4F09A-C83F-451F-A28E-07B56872D7AA}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>LightD3D12UsdStaticScene</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <Import Project="$(SolutionDir)LightD3D12.PIX.props" Condition="exists('$(SolutionDir)LightD3D12.PIX.props')" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <VcpkgRoot Condition="'$(VcpkgRoot)'==''">D:\VisualStudioProyects\DirectX12-Framework-\vcpkg\</VcpkgRoot>
+    <VcpkgTriplet Condition="'$(VcpkgTriplet)'==''">x64-windows</VcpkgTriplet>
+    <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>LightD3D12UsdStaticScene</TargetName>
+    <LightD3D12OpenUsdRoot>$(VcpkgRoot)\installed\$(VcpkgTriplet)\</LightD3D12OpenUsdRoot>
+    <LightD3D12OpenUsdBinDir Condition="'$(Configuration)'=='Debug'">$(LightD3D12OpenUsdRoot)debug\bin</LightD3D12OpenUsdBinDir>
+    <LightD3D12OpenUsdBinDir Condition="'$(Configuration)'!='Debug'">$(LightD3D12OpenUsdRoot)bin</LightD3D12OpenUsdBinDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)LightD3D12\include;$(SolutionDir)third_party\imgui;$(LightD3D12OpenUsdRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(LightD3D12OpenUsdBinDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;usd_usdGeom.lib;usd_usd.lib;usd_sdf.lib;usd_vt.lib;usd_gf.lib;usd_tf.lib;usd_ar.lib;usd_pcp.lib;usd_plug.lib;usd_kind.lib;usd_work.lib;usd_trace.lib;usd_arch.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)LightD3D12\include;$(SolutionDir)third_party\imgui;$(LightD3D12OpenUsdRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(LightD3D12OpenUsdBinDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;d3dcompiler.lib;usd_usdGeom.lib;usd_usd.lib;usd_sdf.lib;usd_vt.lib;usd_gf.lib;usd_tf.lib;usd_ar.lib;usd_pcp.lib;usd_plug.lib;usd_kind.lib;usd_work.lib;usd_trace.lib;usd_arch.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="scene.usd" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\LightD3D12\LightD3D12.vcxproj">
+      <Project>{A96F3AFD-6AB4-4DF6-BF2B-D3D31D34F9C9}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="LightD3D12CopyOpenUsdRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <OpenUsdDlls Include="$(LightD3D12OpenUsdBinDir)\usd_*.dll" />
+      <OpenUsdDlls Include="$(LightD3D12OpenUsdBinDir)\tbb*.dll" />
+      <OpenUsdResources Include="$(LightD3D12OpenUsdBinDir)\usd\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OpenUsdDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(LightD3D12OpenUsdBinDir)')" />
+    <Copy SourceFiles="@(OpenUsdResources)" DestinationFiles="@(OpenUsdResources->'$(OutDir)usd\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="Exists('$(LightD3D12OpenUsdBinDir)\usd')" />
+  </Target>
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

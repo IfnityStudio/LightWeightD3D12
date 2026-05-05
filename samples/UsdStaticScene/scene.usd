@@ -1,0 +1,39 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+def Xform "World"
+{
+    def Cube "RedCube"
+    {
+        double3 xformOp:translate = (-1.65, 0.0, 0.0)
+        double3 xformOp:scale = (0.85, 0.85, 0.85)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        color3f[] primvars:displayColor = [(0.95, 0.22, 0.14)]
+    }
+
+    def Sphere "BlueSphere"
+    {
+        double3 xformOp:translate = (1.10, 0.12, 0.0)
+        double3 xformOp:scale = (0.72, 0.72, 0.72)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        color3f[] primvars:displayColor = [(0.18, 0.48, 1.00)]
+    }
+
+    def Cube "TallGreenCube"
+    {
+        double3 xformOp:translate = (0.0, -0.25, 1.15)
+        double3 xformOp:scale = (0.55, 1.15, 0.55)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        color3f[] primvars:displayColor = [(0.24, 0.88, 0.46)]
+    }
+
+    def Sphere "WarmSmallSphere"
+    {
+        double3 xformOp:translate = (0.05, 0.35, -1.15)
+        double3 xformOp:scale = (0.45, 0.45, 0.45)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        color3f[] primvars:displayColor = [(1.00, 0.70, 0.18)]
+    }
+}
