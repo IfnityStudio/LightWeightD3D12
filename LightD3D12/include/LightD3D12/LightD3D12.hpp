@@ -270,8 +270,7 @@ namespace lightd3d12
 		std::string debugName;
 		uint32_t width = 1;
 		uint32_t height = 1;
-		uint16_t mipLevels = 1;
-		bool mipsEnabled = false;
+		uint16_t countMipMap = 1;
 		uint16_t depthOrArraySize = 1;
 		TextureDimension dimension = TextureDimension::Texture2D;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;

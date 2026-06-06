@@ -15,6 +15,7 @@ namespace lightd3d12
 {
 	class StagingDevice;
 	class Swapchain;
+	class BaseMips;
 
 	class DeviceManager::Impl final
 	{
@@ -34,9 +35,11 @@ namespace lightd3d12
 		void CreateSwapchain();
 
 		uint32_t AllocateBindlessDescriptor();
+		uint32_t AllocateBindlessDescriptorRange( uint32_t count );
 		uint32_t AllocateRtvDescriptor();
 		uint32_t AllocateDsvDescriptor();
 		void FreeBindlessDescriptor( uint32_t index );
+		void FreeBindlessDescriptorRange( uint32_t index, uint32_t count );
 		void FreeRtvDescriptor( uint32_t index );
 		void FreeDsvDescriptor( uint32_t index );
 
@@ -68,7 +71,12 @@ namespace lightd3d12
 		uint32_t bindlessDescriptorSize_ = 0;
 		uint32_t rtvDescriptorSize_ = 0;
 		uint32_t dsvDescriptorSize_ = 0;
-		std::vector<uint32_t> freeBindlessDescriptors_;
+		struct DescriptorRange final
+		{
+			uint32_t start_ = 0;
+			uint32_t count_ = 0;
+		};
+		std::vector<DescriptorRange> freeBindlessRanges_;
 		std::vector<uint32_t> freeRtvDescriptors_;
 		std::vector<uint32_t> freeDsvDescriptors_;
 		ComPtr<ID3D12RootSignature> rootSignature_;
@@ -78,6 +86,7 @@ namespace lightd3d12
 		SlotMap<TextureResource> slotMapTextures_;
 		std::unique_ptr<ImmediateCommands> immediateCommands_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
+		std::unique_ptr<BaseMips> baseMips_;
 		std::array<std::unique_ptr<CommandBufferImpl>, ourMaxActiveCommandBuffers> activeCommandBuffers_ = {};
 		bool bindlessSupported_ = false;
 

@@ -1,5 +1,6 @@
 #include "LightD3D12ManagerImpl.hpp"
 
+#include "LightD3D12BaseMips.hpp"
 #include "LightD3D12StagingDevice.hpp"
 #include "LightD3D12Swapchain.hpp"
 
@@ -178,6 +179,7 @@ namespace lightd3d12
 		InitializeDescriptorHeaps();
 		InitializeRootSignature();
 		InitializeCommandSignature();
+		baseMips_ = std::make_unique<BaseMips>( *this );
 		immediateCommands_ = std::make_unique<ImmediateCommands>(
 			device_.Get(),
 			commandQueue_.Get(),
@@ -303,11 +305,8 @@ namespace lightd3d12
 		rtvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
 		dsvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
 
-		freeBindlessDescriptors_.reserve( desc_.bindlessCapacity );
-		for( uint32_t index = desc_.bindlessCapacity; index > 0; --index )
-		{
-			freeBindlessDescriptors_.push_back( index - 1u );
-		}
+		freeBindlessRanges_.clear();
+		freeBindlessRanges_.push_back( DescriptorRange{ .start_ = 0u, .count_ = desc_.bindlessCapacity } );
 
 		freeRtvDescriptors_.reserve( desc_.rtvCapacity );
 		for( uint32_t index = desc_.rtvCapacity; index > 0; --index )
@@ -388,14 +387,36 @@ namespace lightd3d12
 
 	uint32_t DeviceManager::Impl::AllocateBindlessDescriptor()
 	{
-		if( freeBindlessDescriptors_.empty() )
+		return AllocateBindlessDescriptorRange( 1u );
+	}
+
+	uint32_t DeviceManager::Impl::AllocateBindlessDescriptorRange( uint32_t count )
+	{
+		if( count == 0 )
 		{
-			throw std::runtime_error( "Bindless descriptor heap is exhausted." );
+			throw std::runtime_error( "Bindless descriptor allocation count must be greater than zero." );
 		}
 
-		const uint32_t index = freeBindlessDescriptors_.back();
-		freeBindlessDescriptors_.pop_back();
-		return index;
+		for( size_t rangeIndex = 0; rangeIndex < freeBindlessRanges_.size(); ++rangeIndex )
+		{
+			DescriptorRange& range = freeBindlessRanges_[ rangeIndex ];
+			if( range.count_ < count )
+			{
+				continue;
+			}
+
+			const uint32_t start = range.start_;
+			range.start_ += count;
+			range.count_ -= count;
+			if( range.count_ == 0 )
+			{
+				freeBindlessRanges_.erase( freeBindlessRanges_.begin() + static_cast<ptrdiff_t>( rangeIndex ) );
+			}
+
+			return start;
+		}
+
+		throw std::runtime_error( "Bindless descriptor heap is exhausted." );
 	}
 
 	uint32_t DeviceManager::Impl::AllocateRtvDescriptor()
@@ -424,9 +445,41 @@ namespace lightd3d12
 
 	void DeviceManager::Impl::FreeBindlessDescriptor( uint32_t index )
 	{
-		if( index != UINT32_MAX )
+		FreeBindlessDescriptorRange( index, 1u );
+	}
+
+	void DeviceManager::Impl::FreeBindlessDescriptorRange( uint32_t index, uint32_t count )
+	{
+		if( index == UINT32_MAX || count == 0 )
 		{
-			freeBindlessDescriptors_.push_back( index );
+			return;
+		}
+
+		DescriptorRange mergedRange{ .start_ = index, .count_ = count };
+		auto insertIt = freeBindlessRanges_.begin();
+		while( insertIt != freeBindlessRanges_.end() && insertIt->start_ < mergedRange.start_ )
+		{
+			++insertIt;
+		}
+
+		insertIt = freeBindlessRanges_.insert( insertIt, mergedRange );
+
+		if( insertIt != freeBindlessRanges_.begin() )
+		{
+			auto previous = insertIt - 1;
+			if( previous->start_ + previous->count_ == insertIt->start_ )
+			{
+				previous->count_ += insertIt->count_;
+				insertIt = freeBindlessRanges_.erase( insertIt );
+				insertIt = previous;
+			}
+		}
+
+		auto next = insertIt + 1;
+		if( next != freeBindlessRanges_.end() && insertIt->start_ + insertIt->count_ == next->start_ )
+		{
+			insertIt->count_ += next->count_;
+			freeBindlessRanges_.erase( next );
 		}
 	}
 
@@ -555,6 +608,7 @@ namespace lightd3d12
 
 		stagingDevice_.reset();
 		immediateCommands_.reset();
+		baseMips_.reset();
 
 		for( auto* buffer : slotMapBuffers_.GetAll() )
 		{
