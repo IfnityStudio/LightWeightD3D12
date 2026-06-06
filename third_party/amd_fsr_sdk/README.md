@@ -3,7 +3,13 @@
 This folder is the expected drop location for the official AMD FSR SDK package
 used by the Visual Studio solution.
 
-Expected layout after extracting the SDK:
+Run this from the repository root to fill it automatically:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1
+```
+
+Expected layout after bootstrap:
 
 - `third_party/amd_fsr_sdk/Kits/FidelityFX/api/include/ffx_api.h`
 - `third_party/amd_fsr_sdk/Kits/FidelityFX/upscalers/include/ffx_upscale.h`
