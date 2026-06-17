@@ -183,12 +183,6 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuideVS.hlsl"
     )
 
-    ourAddSample(
-        LightD3D12VectorFields3D
-        "${ourLightD3D12Root}/samples/VectorFields3D/main.cpp"
-        "${ourLightD3D12Root}/samples/VectorFields3D/CMakeLists.txt"
-    )
-
     target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12GlobeMap PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12TexturePlane PRIVATE windowscodecs ole32)
@@ -226,7 +220,5 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/RayMarchingGuide/README.md"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuidePS.hlsl"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuideVS.hlsl"
-        "${ourLightD3D12Root}/samples/VectorFields3D/main.cpp"
-        "${ourLightD3D12Root}/samples/VectorFields3D/CMakeLists.txt"
     )
 endif()
