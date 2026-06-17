@@ -19,11 +19,11 @@ namespace lightd3d12
 		{
 			auto& buffer = buffers_[ i ];
 
-			detail::ThrowIfFailed(
+			C_RESULT(
 				device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( buffer.allocator_.GetAddressOf() ) ),
 				"Failed to create command allocator." );
 
-			detail::ThrowIfFailed(
+			C_RESULT(
 				device_->CreateCommandList(
 					0,
 					D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -34,7 +34,7 @@ namespace lightd3d12
 
 			buffer.commandList_->Close();
 
-			detail::ThrowIfFailed(
+			C_RESULT(
 				device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( buffer.fence_.GetAddressOf() ) ),
 				"Failed to create fence for immediate command buffer." );
 
@@ -106,8 +106,8 @@ namespace lightd3d12
 		assert( current != nullptr );
 		assert( numAvailableCommandBuffers_ > 0 );
 
-		detail::ThrowIfFailed( current->allocator_->Reset(), "Failed to reset immediate command allocator." );
-		detail::ThrowIfFailed( current->commandList_->Reset( current->allocator_.Get(), nullptr ), "Failed to reset immediate command list." );
+		C_RESULT( current->allocator_->Reset(), "Failed to reset immediate command allocator." );
+		C_RESULT( current->commandList_->Reset( current->allocator_.Get(), nullptr ), "Failed to reset immediate command list." );
 
 		current->handle_.submitId_ = fenceCounter_;
 		current->isEncoding_ = true;
@@ -125,7 +125,7 @@ namespace lightd3d12
 	{
 		assert( wrapper.isEncoding_ );
 
-		detail::ThrowIfFailed( wrapper.commandList_->Close(), "Failed to close immediate command list." );
+		C_RESULT( wrapper.commandList_->Close(), "Failed to close immediate command list." );
 
 		std::array<ID3D12CommandList*, 2> commandLists = {};
 		uint32_t numCommandLists = 0;
@@ -136,7 +136,7 @@ namespace lightd3d12
 		commandLists[ numCommandLists++ ] = wrapper.commandList_.Get();
 
 		queue_->ExecuteCommandLists( numCommandLists, commandLists.data() );
-		detail::ThrowIfFailed( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
+		C_RESULT( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
 
 		wrapper.fenceValue_ = fenceCounter_;
 		wrapper.isEncoding_ = false;

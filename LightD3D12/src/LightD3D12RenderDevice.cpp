@@ -158,6 +158,188 @@ namespace lightd3d12
 
 			return flags;
 		}
+
+		void ValidateTextureDesc( const TextureDesc& desc )
+		{
+			if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) && HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
+			{
+				throw std::runtime_error( "A texture cannot be both RenderTarget and DepthStencil." );
+			}
+
+			if( HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) && HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
+			{
+				throw std::runtime_error( "DepthStencil textures cannot expose UAVs." );
+			}
+
+			if( desc.dimension != TextureDimension::Texture3D )
+			{
+				return;
+			}
+
+			if( desc.depthOrArraySize <= 1 )
+			{
+				throw std::runtime_error( "Texture3D resources require depthOrArraySize > 1." );
+			}
+
+			if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) || HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
+			{
+				throw std::runtime_error( "This lightweight API currently supports Texture3D only for SRV/UAV usage." );
+			}
+
+			if( desc.data != nullptr )
+			{
+				throw std::runtime_error( "Texture3D CPU uploads are not implemented yet. Populate them with compute or add a staging path." );
+			}
+		}
+
+		[[nodiscard]] D3D12_RESOURCE_DESC BuildTextureResourceDesc( const TextureDesc& desc, const TextureResource& resource ) noexcept
+		{
+			if( desc.dimension == TextureDimension::Texture3D )
+			{
+				return CD3DX12_RESOURCE_DESC::Tex3D(
+					resource.formats_.resource_,
+					desc.width,
+					desc.height,
+					desc.depthOrArraySize,
+					resource.mipLevels_,
+					resource.usageFlags_ );
+			}
+
+			return CD3DX12_RESOURCE_DESC::Tex2D(
+				resource.formats_.resource_,
+				desc.width,
+				desc.height,
+				desc.depthOrArraySize,
+				resource.mipLevels_,
+				1,
+				0,
+				resource.usageFlags_ );
+		}
+
+		[[nodiscard]] TextureResource PrepareTextureResource( const TextureDesc& desc, const TextureCreationPlan& creationPlan )
+		{
+			TextureResource resource;
+			resource.width_ = desc.width;
+			resource.height_ = desc.height;
+			resource.mipLevels_ = creationPlan.mipLevels_;
+			resource.depthOrArraySize_ = desc.depthOrArraySize;
+			resource.dimension_ = desc.dimension;
+			resource.format_ = desc.format;
+			resource.formats_ = ResolveTextureFormats( desc, creationPlan.requiresTypedUavViews_ );
+			resource.usageFlags_ = ResolveTextureResourceFlags( desc.usage, creationPlan.requiresTypedUavViews_ );
+			resource.currentState_ = desc.initialState;
+			resource.isDepthFormat_ = TextureResource::IsDepthFormat( resource.formats_.dsv_ );
+			resource.isStencilFormat_ = TextureResource::IsDepthStencilFormat( resource.formats_.dsv_ );
+
+			if( creationPlan.requiresTypedUavViews_ && resource.formats_.uav_ == DXGI_FORMAT_UNKNOWN )
+			{
+				throw std::runtime_error( "This texture format cannot expose the typed UAVs required by the requested usage." );
+			}
+
+			resource.desc_ = BuildTextureResourceDesc( desc, resource );
+			return resource;
+		}
+
+		void CreateCommittedTextureResource( DeviceManager::Impl& impl, const TextureDesc& desc, TextureResource& resource )
+		{
+			const auto heapProps = CD3DX12_HEAP_PROPERTIES( D3D12_HEAP_TYPE_DEFAULT );
+			const D3D12_CLEAR_VALUE* clearValue = desc.useClearValue ? &desc.clearValue : nullptr;
+			C_RESULT(
+				impl.device_->CreateCommittedResource(
+					&heapProps,
+					D3D12_HEAP_FLAG_NONE,
+					&resource.desc_,
+					desc.initialState,
+					clearValue,
+					IID_PPV_ARGS( resource.resource_.GetAddressOf() ) ),
+				"Failed to create texture resource." );
+		}
+
+		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE MakeBindlessCpuHandle( DeviceManager::Impl& impl, uint32_t index ) noexcept
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE handle = impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
+			handle.ptr += static_cast<SIZE_T>( index ) * impl.bindlessDescriptorSize_;
+			return handle;
+		}
+
+		void CreateTextureShaderResourceView( DeviceManager::Impl& impl, TextureResource& resource )
+		{
+			resource.srvIndex_ = impl.AllocateBindlessDescriptor();
+			resource.srvHandle_ = MakeBindlessCpuHandle( impl, resource.srvIndex_ );
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Format = resource.formats_.srv_;
+			if( resource.dimension_ == TextureDimension::Texture3D )
+			{
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+				srvDesc.Texture3D.MipLevels = resource.mipLevels_;
+			}
+			else
+			{
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				srvDesc.Texture2D.MipLevels = resource.mipLevels_;
+			}
+			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
+		}
+
+		void CreateTextureBaseMipViews( DeviceManager::Impl& impl, TextureResource& resource )
+		{
+			resource.baseMipsUavCount_ = static_cast<uint16_t>( resource.mipLevels_ - 1u );
+			resource.baseMipsUavBaseIndex_ = impl.AllocateBindlessDescriptorRange( resource.baseMipsUavCount_ );
+			for( uint16_t mipLevel = 1; mipLevel < resource.mipLevels_; ++mipLevel )
+			{
+				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+				uavDesc.Format = resource.formats_.uav_;
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+				uavDesc.Texture2D.MipSlice = mipLevel;
+
+				impl.device_->CreateUnorderedAccessView(
+					resource.resource_.Get(),
+					nullptr,
+					&uavDesc,
+					MakeBindlessCpuHandle( impl, resource.baseMipsUavBaseIndex_ + static_cast<uint32_t>( mipLevel - 1u ) ) );
+			}
+		}
+
+		void CreateTextureUnorderedAccessView( DeviceManager::Impl& impl, TextureResource& resource )
+		{
+			resource.uavIndex_ = impl.AllocateBindlessDescriptor();
+			resource.uavHandle_ = MakeBindlessCpuHandle( impl, resource.uavIndex_ );
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+			uavDesc.Format = resource.formats_.uav_;
+			uavDesc.ViewDimension = resource.dimension_ == TextureDimension::Texture3D ? D3D12_UAV_DIMENSION_TEXTURE3D : D3D12_UAV_DIMENSION_TEXTURE2D;
+			if( resource.dimension_ == TextureDimension::Texture3D )
+			{
+				uavDesc.Texture3D.WSize = resource.depthOrArraySize_;
+			}
+			impl.device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr, &uavDesc, resource.uavHandle_ );
+		}
+
+		void CreateTextureRenderTargetView( DeviceManager::Impl& impl, TextureResource& resource )
+		{
+			resource.rtvIndex_ = impl.AllocateRtvDescriptor();
+			resource.rtvHandle_ = impl.rtvHeap_->GetCPUDescriptorHandleForHeapStart();
+			resource.rtvHandle_.ptr += static_cast<SIZE_T>( resource.rtvIndex_ ) * impl.rtvDescriptorSize_;
+
+			D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+			rtvDesc.Format = resource.formats_.rtv_;
+			rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			impl.device_->CreateRenderTargetView( resource.resource_.Get(), &rtvDesc, resource.rtvHandle_ );
+		}
+
+		void CreateTextureDepthStencilView( DeviceManager::Impl& impl, TextureResource& resource )
+		{
+			resource.dsvIndex_ = impl.AllocateDsvDescriptor();
+			resource.dsvHandle_ = impl.dsvHeap_->GetCPUDescriptorHandleForHeapStart();
+			resource.dsvHandle_.ptr += static_cast<SIZE_T>( resource.dsvIndex_ ) * impl.dsvDescriptorSize_;
+
+			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+			dsvDesc.Format = resource.formats_.dsv_;
+			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+			impl.device_->CreateDepthStencilView( resource.resource_.Get(), &dsvDesc, resource.dsvHandle_ );
+		}
 	}
 
 	RenderPipelineDesc::RenderPipelineDesc() noexcept
@@ -214,8 +396,9 @@ namespace lightd3d12
 	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
 		auto& impl = *manager_->impl_;
+		auto& graphicsQueue = impl.GetGraphicsQueueContext();
 		std::unique_ptr<CommandBufferImpl>* availableSlot = nullptr;
-		for(std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : impl.activeCommandBuffers_ )
+		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
 		{
 			if( activeCommandBuffer == nullptr )
 			{
@@ -230,25 +413,32 @@ namespace lightd3d12
 		}
 
 		impl.ProcessDeferredReleases();
-		auto& wrapper = impl.immediateCommands_->Acquire();
+		auto& wrapper = graphicsQueue.immediateCommands_->Acquire();
 		*availableSlot = std::make_unique<CommandBufferImpl>( impl, wrapper );
 		return **availableSlot;
 	}
 
-	TextureHandle RenderDevice::GetCurrentSwapchainTexture() const
+	TextureHandle RenderDevice::GetCurrentSwapchainTexture( SwapchainHandle swapchain ) const
 	{
-		const auto& impl = *manager_->impl_;
-		if( impl.swapchain_ == nullptr )
+		auto& impl = *manager_->impl_;
+		if( !swapchain.Valid() )
+		{
+			swapchain = manager_->primarySwapchain_;
+		}
+
+		Swapchain* nativeSwapchain = impl.GetSwapchain( swapchain );
+		if( nativeSwapchain == nullptr )
 		{
 			return {};
 		}
 
-		return impl.swapchain_->GetCurrentTexture();
+		return nativeSwapchain->GetCurrentTexture();
 	}
 
 	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer, TextureHandle presentTexture )
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
+		auto& graphicsQueue = impl.GetGraphicsQueueContext();
 		CommandBufferImpl* commandBuffer = dynamic_cast<CommandBufferImpl*>( &buffer );
 		if( commandBuffer == nullptr )
 		{
@@ -256,7 +446,7 @@ namespace lightd3d12
 		}
 
 		std::unique_ptr<CommandBufferImpl>* activeSlot = nullptr;
-		for( auto& activeCommandBuffer : impl.activeCommandBuffers_ )
+		for( auto& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
 		{
 			if( activeCommandBuffer.get() == commandBuffer )
 			{
@@ -281,7 +471,7 @@ namespace lightd3d12
 		}
 
 		auto submitFixup = commandBuffer->BuildSubmitFixup();
-		const SubmitHandle handle = impl.immediateCommands_->Submit( commandBuffer->Wrapper(), submitFixup.commandList_.Get() );
+		const SubmitHandle handle = graphicsQueue.immediateCommands_->Submit( commandBuffer->Wrapper(), submitFixup.commandList_.Get() );
 		commandBuffer->CommitSubmittedTextureStates();
 		if( submitFixup.Valid() )
 		{
@@ -298,12 +488,13 @@ namespace lightd3d12
 
 		if( presentTexture.Valid() )
 		{
-			if( impl.swapchain_ == nullptr )
+			Swapchain* owningSwapchain = impl.GetOwningSwapchain( presentTexture );
+			if( owningSwapchain == nullptr )
 			{
-				throw std::runtime_error( "Swapchain is not initialized." );
+				throw std::runtime_error( "Present texture does not belong to a swapchain." );
 			}
 
-			impl.swapchain_->Present();
+			owningSwapchain->Present();
 		}
 		impl.ProcessDeferredReleases();
 		return handle;
@@ -375,7 +566,7 @@ namespace lightd3d12
 		psoDesc.SampleDesc = { 1, 0 };
 
 		RenderPipelineState pipeline;
-		detail::ThrowIfFailed( impl.device_->CreateGraphicsPipelineState( &psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ), "Failed to create graphics pipeline state." );
+		C_RESULT( impl.device_->CreateGraphicsPipelineState( &psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ), "Failed to create graphics pipeline state." );
 		pipeline.topology_ = desc.topology;
 		return pipeline;
 	}
@@ -395,7 +586,7 @@ namespace lightd3d12
 		psoDesc.CS = computeShader.Bytecode();
 
 		ComputePipelineState pipeline;
-		detail::ThrowIfFailed( impl.device_->CreateComputePipelineState( &psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ), "Failed to create compute pipeline state." );
+		C_RESULT( impl.device_->CreateComputePipelineState( &psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ), "Failed to create compute pipeline state." );
 		return pipeline;
 	}
 
@@ -417,7 +608,7 @@ namespace lightd3d12
 		resource.currentState_ = desc.heapType == D3D12_HEAP_TYPE_UPLOAD ? D3D12_RESOURCE_STATE_GENERIC_READ : desc.initialState;
 
 		const auto heapProps = CD3DX12_HEAP_PROPERTIES( desc.heapType );
-		detail::ThrowIfFailed(
+		C_RESULT(
 			impl.device_->CreateCommittedResource(
 				&heapProps,
 				D3D12_HEAP_FLAG_NONE,
@@ -430,7 +621,7 @@ namespace lightd3d12
 		resource.gpuAddress_ = resource.resource_->GetGPUVirtualAddress();
 		if( desc.heapType == D3D12_HEAP_TYPE_UPLOAD )
 		{
-			detail::ThrowIfFailed( resource.resource_->Map( 0, nullptr, &resource.mappedPtr_ ), "Failed to map upload buffer." );
+			C_RESULT( resource.resource_->Map( 0, nullptr, &resource.mappedPtr_ ), "Failed to map upload buffer." );
 		}
 
 		if( desc.createShaderResourceView )
@@ -469,172 +660,34 @@ namespace lightd3d12
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
 	{
 		auto& impl = *manager_->impl_;
-		if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) && HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
-		{
-			throw std::runtime_error( "A texture cannot be both RenderTarget and DepthStencil." );
-		}
-
-		if( HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) && HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
-		{
-			throw std::runtime_error( "DepthStencil textures cannot expose UAVs." );
-		}
-
+		ValidateTextureDesc( desc );
 		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
-
-		if( desc.dimension == TextureDimension::Texture3D )
-		{
-			if( desc.depthOrArraySize <= 1 )
-			{
-				throw std::runtime_error( "Texture3D resources require depthOrArraySize > 1." );
-			}
-
-			if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) || HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
-			{
-				throw std::runtime_error( "This lightweight API currently supports Texture3D only for SRV/UAV usage." );
-			}
-
-			if( desc.data != nullptr )
-			{
-				throw std::runtime_error( "Texture3D CPU uploads are not implemented yet. Populate them with compute or add a staging path." );
-			}
-		}
-
-		TextureResource resource;
-		resource.width_ = desc.width;
-		resource.height_ = desc.height;
-		resource.mipLevels_ = creationPlan.mipLevels_;
-		resource.depthOrArraySize_ = desc.depthOrArraySize;
-		resource.dimension_ = desc.dimension;
-		resource.format_ = desc.format;
-		resource.formats_ = ResolveTextureFormats( desc, creationPlan.requiresTypedUavViews_ );
-		resource.usageFlags_ = ResolveTextureResourceFlags( desc.usage, creationPlan.requiresTypedUavViews_ );
-		resource.currentState_ = desc.initialState;
-		resource.isDepthFormat_ = TextureResource::IsDepthFormat( resource.formats_.dsv_ );
-		resource.isStencilFormat_ = TextureResource::IsDepthStencilFormat( resource.formats_.dsv_ );
-
-		if( creationPlan.requiresTypedUavViews_ && resource.formats_.uav_ == DXGI_FORMAT_UNKNOWN )
-		{
-			throw std::runtime_error( "This texture format cannot expose the typed UAVs required by the requested usage." );
-		}
-
-		if( desc.dimension == TextureDimension::Texture3D )
-		{
-			resource.desc_ = CD3DX12_RESOURCE_DESC::Tex3D(
-				resource.formats_.resource_,
-				desc.width,
-				desc.height,
-				desc.depthOrArraySize,
-				resource.mipLevels_,
-				resource.usageFlags_ );
-		}
-		else
-		{
-			resource.desc_ = CD3DX12_RESOURCE_DESC::Tex2D(
-				resource.formats_.resource_,
-				desc.width,
-				desc.height,
-				desc.depthOrArraySize,
-				resource.mipLevels_,
-				1,
-				0,
-				resource.usageFlags_ );
-		}
-
-		const auto heapProps = CD3DX12_HEAP_PROPERTIES( D3D12_HEAP_TYPE_DEFAULT );
-		const D3D12_CLEAR_VALUE* clearValue = desc.useClearValue ? &desc.clearValue : nullptr;
-		detail::ThrowIfFailed(
-			impl.device_->CreateCommittedResource(
-				&heapProps,
-				D3D12_HEAP_FLAG_NONE,
-				&resource.desc_,
-				desc.initialState,
-				clearValue,
-				IID_PPV_ARGS( resource.resource_.GetAddressOf() ) ),
-			"Failed to create texture resource." );
-
-		const auto makeBindlessCpuHandle = [ &impl ]( uint32_t index )
-		{
-			D3D12_CPU_DESCRIPTOR_HANDLE handle = impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
-			handle.ptr += static_cast<SIZE_T>( index ) * impl.bindlessDescriptorSize_;
-			return handle;
-		};
+		TextureResource resource = PrepareTextureResource( desc, creationPlan );
+		CreateCommittedTextureResource( impl, desc, resource );
 
 		if( HasTextureUsage( desc.usage, TextureUsage::Sampled ) )
 		{
-			resource.srvIndex_ = impl.AllocateBindlessDescriptor();
-			resource.srvHandle_ = impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.srvHandle_.ptr += static_cast<SIZE_T>( resource.srvIndex_ ) * impl.bindlessDescriptorSize_;
-
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = resource.formats_.srv_;
-			if( desc.dimension == TextureDimension::Texture3D )
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-				srvDesc.Texture3D.MipLevels = resource.mipLevels_;
-			}
-			else
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srvDesc.Texture2D.MipLevels = resource.mipLevels_;
-			}
-			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
+			CreateTextureShaderResourceView( impl, resource );
 		}
 
 		if( creationPlan.generateInitialMipChain_ )
 		{
-			resource.baseMipsUavCount_ = static_cast<uint16_t>( resource.mipLevels_ - 1u );
-			resource.baseMipsUavBaseIndex_ = impl.AllocateBindlessDescriptorRange( resource.baseMipsUavCount_ );
-			for( uint16_t mipLevel = 1; mipLevel < resource.mipLevels_; ++mipLevel )
-			{
-				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-				uavDesc.Format = resource.formats_.uav_;
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-				uavDesc.Texture2D.MipSlice = mipLevel;
-
-				impl.device_->CreateUnorderedAccessView(
-					resource.resource_.Get(),
-					nullptr,
-					&uavDesc,
-					makeBindlessCpuHandle( resource.baseMipsUavBaseIndex_ + static_cast<uint32_t>( mipLevel - 1u ) ) );
-			}
+			CreateTextureBaseMipViews( impl, resource );
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
 		{
-			resource.uavIndex_ = impl.AllocateBindlessDescriptor();
-			resource.uavHandle_ = makeBindlessCpuHandle( resource.uavIndex_ );
-
-			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-			uavDesc.Format = resource.formats_.uav_;
-			uavDesc.ViewDimension = desc.dimension == TextureDimension::Texture3D ? D3D12_UAV_DIMENSION_TEXTURE3D : D3D12_UAV_DIMENSION_TEXTURE2D;
-			if( desc.dimension == TextureDimension::Texture3D )
-			{
-				uavDesc.Texture3D.WSize = desc.depthOrArraySize;
-			}
-			impl.device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr, &uavDesc, resource.uavHandle_ );
+			CreateTextureUnorderedAccessView( impl, resource );
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) )
 		{
-			resource.rtvIndex_ = impl.AllocateRtvDescriptor();
-			resource.rtvHandle_ = impl.rtvHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.rtvHandle_.ptr += static_cast<SIZE_T>( resource.rtvIndex_ ) * impl.rtvDescriptorSize_;
-			D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-			rtvDesc.Format = resource.formats_.rtv_;
-			rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			impl.device_->CreateRenderTargetView( resource.resource_.Get(), &rtvDesc, resource.rtvHandle_ );
+			CreateTextureRenderTargetView( impl, resource );
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
 		{
-			resource.dsvIndex_ = impl.AllocateDsvDescriptor();
-			resource.dsvHandle_ = impl.dsvHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.dsvHandle_.ptr += static_cast<SIZE_T>( resource.dsvIndex_ ) * impl.dsvDescriptorSize_;
-			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-			dsvDesc.Format = resource.formats_.dsv_;
-			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-			impl.device_->CreateDepthStencilView( resource.resource_.Get(), &dsvDesc, resource.dsvHandle_ );
+			CreateTextureDepthStencilView( impl, resource );
 		}
 
 		const TextureHandle handle = impl.slotMapTextures_.Create( std::move( resource ) );
@@ -649,6 +702,13 @@ namespace lightd3d12
 		}
 
 		return handle;
+	}
+
+	void RenderDevice::DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch )
+	{
+		auto& impl = *manager_->impl_;
+		TextureResource& textureResource = impl.GetTextureResource( texture );
+		impl.stagingDevice_->TextureData2D( textureResource, outData, rowPitch, slicePitch );
 	}
 
 	uint32_t RenderDevice::GetBindlessIndex( BufferHandle buffer ) const
@@ -669,6 +729,11 @@ namespace lightd3d12
 	ID3D12Device* RenderDevice::GetNativeDevice() const noexcept
 	{
 		return manager_->impl_->device_.Get();
+	}
+
+	ID3D12CommandQueue* RenderDevice::GetNativeCommandQueue() const noexcept
+	{
+		return manager_->impl_->GetGraphicsQueueContext().commandQueue_.Get();
 	}
 
 	ID3D12Resource* RenderDevice::GetNativeTextureResource( TextureHandle texture ) const

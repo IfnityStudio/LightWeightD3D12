@@ -8,12 +8,51 @@
 #include "../../third_party/imgui/backends/imgui_impl_dx12.h"
 #include "../../third_party/imgui/backends/imgui_impl_win32.h"
 
+#include <array>
+#include <filesystem>
 #include <stdexcept>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam );
 
 namespace lightd3d12
 {
+	constexpr float ourImguiFontSize = 18.0f;
+	constexpr float ourImguiStyleScale = 1.10f;
+
+	void ConfigureImguiFontAndStyle()
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.ScaleAllSizes( ourImguiStyleScale );
+
+		const std::filesystem::path repoRoot = std::filesystem::path( __FILE__ ).parent_path().parent_path().parent_path();
+		const std::array<std::filesystem::path, 2> candidateFonts = {
+			repoRoot / "third_party" / "imgui" / "misc" / "fonts" / "Roboto-Medium.ttf",
+			repoRoot / "third_party" / "imgui" / "misc" / "fonts" / "DroidSans.ttf"
+		};
+
+		ImFontConfig fontConfig{};
+		fontConfig.OversampleH = 2;
+		fontConfig.OversampleV = 2;
+
+		for( const std::filesystem::path& fontPath : candidateFonts )
+		{
+			if( !std::filesystem::exists( fontPath ) )
+			{
+				continue;
+			}
+
+			ImFont* font = io.Fonts->AddFontFromFileTTF( fontPath.string().c_str(), ourImguiFontSize, &fontConfig );
+			if( font != nullptr )
+			{
+				io.FontDefault = font;
+				return;
+			}
+		}
+
+		io.FontDefault = io.Fonts->AddFontDefault();
+	}
+
 	struct ImguiRenderer::Impl final
 	{
 		Impl( DeviceManager& deviceManager, NativeWindowHandle window ):
@@ -44,6 +83,7 @@ namespace lightd3d12
 			ImGuiIO& io = ImGui::GetIO();
 			io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 			ImGui::StyleColorsDark();
+			ConfigureImguiFontAndStyle();
 
 			if( !ImGui_ImplWin32_Init( hwnd ) )
 			{
@@ -54,7 +94,7 @@ namespace lightd3d12
 
 			ImGui_ImplDX12_InitInfo initInfo{};
 			initInfo.Device = manager.device_.Get();
-			initInfo.CommandQueue = manager.commandQueue_.Get();
+			initInfo.CommandQueue = manager.GetGraphicsQueueContext().commandQueue_.Get();
 			initInfo.NumFramesInFlight = static_cast< int >( std::max( 1u, manager.desc_.framesInFlight ) );
 			initInfo.RTVFormat = manager.desc_.swapchainFormat;
 			initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;

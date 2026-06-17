@@ -6,10 +6,9 @@
 
 namespace lightd3d12
 {
-	Swapchain::Swapchain( DeviceManager::Impl& ctx, HWND hwnd, uint32_t width, uint32_t height ):
+	Swapchain::Swapchain( DeviceManager::Impl& ctx, SwapchainHandle swapchainHandle, HWND hwnd, uint32_t width, uint32_t height ):
 		ctx_( ctx ),
-		width_( width ),
-		height_( height )
+		swapchainHandle_( swapchainHandle )
 	{
 		if( ctx_.desc_.swapchainBufferCount == 0 || ctx_.desc_.swapchainBufferCount > ourMaxSwapchainBuffers )
 		{
@@ -17,8 +16,8 @@ namespace lightd3d12
 		}
 
 		DXGI_SWAP_CHAIN_DESC1 swapchainDesc{};
-		swapchainDesc.Width = width_;
-		swapchainDesc.Height = height_;
+		swapchainDesc.Width = width;
+		swapchainDesc.Height = height;
 		swapchainDesc.Format = ctx_.desc_.swapchainFormat;
 		swapchainDesc.BufferCount = ctx_.desc_.swapchainBufferCount;
 		swapchainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -30,9 +29,9 @@ namespace lightd3d12
 		swapchainDesc.Flags = ctx_.desc_.allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0u;
 
 		ComPtr<IDXGISwapChain1> tempSwapchain;
-		detail::ThrowIfFailed(
+		C_RESULT(
 			ctx_.factory_->CreateSwapChainForHwnd(
-				ctx_.commandQueue_.Get(),
+				ctx_.GetGraphicsQueueContext().commandQueue_.Get(),
 				hwnd,
 				&swapchainDesc,
 				nullptr,
@@ -40,12 +39,14 @@ namespace lightd3d12
 				tempSwapchain.GetAddressOf() ),
 			"Failed to create swapchain." );
 
-		detail::ThrowIfFailed( tempSwapchain.As( &swapchain_ ), "Failed to query IDXGISwapChain4." );
+		C_RESULT( tempSwapchain.As( &swapchain_ ), "Failed to query IDXGISwapChain4." );
 		ctx_.factory_->MakeWindowAssociation( hwnd, DXGI_MWA_NO_ALT_ENTER );
 
-		surfaceFormat_ = swapchainDesc.Format;
-		numSwapchainImages_ = swapchainDesc.BufferCount;
-		currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
+		properties_.surfaceFormat_ = swapchainDesc.Format;
+		properties_.numSwapchainImages_ = swapchainDesc.BufferCount;
+		properties_.currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
+		properties_.width_ = width;
+		properties_.height_ = height;
 
 		RecreateBackBuffers();
 	}
@@ -59,8 +60,8 @@ namespace lightd3d12
 	void Swapchain::Present()
 	{
 		const UINT presentFlags = ( !CheckVSyncEnabled() && ctx_.desc_.allowTearing ) ? DXGI_PRESENT_ALLOW_TEARING : 0u;
-		detail::ThrowIfFailed( swapchain_->Present( CheckVSyncEnabled() ? 1u : 0u, presentFlags ), "Failed to Present swapchain." );
-		currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
+		C_RESULT( swapchain_->Present( CheckVSyncEnabled() ? 1u : 0u, presentFlags ), "Failed to Present swapchain." );
+		properties_.currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
 	}
 
 	void Swapchain::Resize( uint32_t width, uint32_t height )
@@ -72,46 +73,46 @@ namespace lightd3d12
 
 		DestroyBackBuffers();
 
-		width_ = width;
-		height_ = height;
-		detail::ThrowIfFailed(
+		properties_.width_ = width;
+		properties_.height_ = height;
+		C_RESULT(
 			swapchain_->ResizeBuffers(
 				ctx_.desc_.swapchainBufferCount,
-				width_,
-				height_,
-				surfaceFormat_,
+				properties_.width_,
+				properties_.height_,
+				properties_.surfaceFormat_,
 				ctx_.desc_.allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0u ),
 			"Failed to Resize swapchain." );
 
-		numSwapchainImages_ = ctx_.desc_.swapchainBufferCount;
-		currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
+		properties_.numSwapchainImages_ = ctx_.desc_.swapchainBufferCount;
+		properties_.currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
 		RecreateBackBuffers();
 	}
 
 	TextureHandle Swapchain::GetCurrentTexture()
 	{
-		if( swapchain_ == nullptr || numSwapchainImages_ == 0 )
+		if( swapchain_ == nullptr || properties_.numSwapchainImages_ == 0 )
 		{
 			return {};
 		}
 
-		currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
-		if( currentBackBufferIndex_ >= numSwapchainImages_ )
+		properties_.currentBackBufferIndex_ = swapchain_->GetCurrentBackBufferIndex();
+		if( properties_.currentBackBufferIndex_ >= properties_.numSwapchainImages_ )
 		{
 			return {};
 		}
 
-		return backBufferHandles_[ currentBackBufferIndex_ ];
+		return backBufferHandles_[ properties_.currentBackBufferIndex_ ];
 	}
 
 	uint32_t Swapchain::GetCurrentBackBufferIndex() const noexcept
 	{
-		return currentBackBufferIndex_;
+		return properties_.currentBackBufferIndex_;
 	}
 
 	DXGI_FORMAT Swapchain::GetSurfaceFormat() const noexcept
 	{
-		return surfaceFormat_;
+		return properties_.surfaceFormat_;
 	}
 
 	IDXGISwapChain4* Swapchain::GetSwapchain() const noexcept
@@ -121,7 +122,7 @@ namespace lightd3d12
 
 	void Swapchain::DestroyBackBuffers() noexcept
 	{
-		for( uint32_t index = 0; index < numSwapchainImages_; ++index )
+		for( uint32_t index = 0; index < properties_.numSwapchainImages_; ++index )
 		{
 			const TextureHandle handle = backBufferHandles_[ index ];
 			auto* texture = ctx_.slotMapTextures_.Get( handle );
@@ -137,21 +138,21 @@ namespace lightd3d12
 			backBuffers_[ index ].Reset();
 		}
 
-		numSwapchainImages_ = 0;
-		currentBackBufferIndex_ = 0;
+		properties_.numSwapchainImages_ = 0;
+		properties_.currentBackBufferIndex_ = 0;
 	}
 
 	void Swapchain::RecreateBackBuffers()
 	{
-		if( numSwapchainImages_ > backBuffers_.size() )
+		if( properties_.numSwapchainImages_ > backBuffers_.size() )
 		{
 			throw std::runtime_error( "Swapchain image count exceeds fixed back buffer storage." );
 		}
 
-		for( uint32_t index = 0; index < numSwapchainImages_; ++index )
+		for( uint32_t index = 0; index < properties_.numSwapchainImages_; ++index )
 		{
 			ComPtr<ID3D12Resource> buffer;
-			detail::ThrowIfFailed( swapchain_->GetBuffer( index, IID_PPV_ARGS( buffer.GetAddressOf() ) ), "Failed to get swapchain back buffer." );
+			C_RESULT( swapchain_->GetBuffer( index, IID_PPV_ARGS( buffer.GetAddressOf() ) ), "Failed to get swapchain back buffer." );
 
 			backBuffers_[ index ] = buffer;
 
@@ -159,21 +160,22 @@ namespace lightd3d12
 			texture.resource_ = buffer;
 			texture.usageFlags_ = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 			texture.currentState_ = D3D12_RESOURCE_STATE_PRESENT;
-			texture.format_ = surfaceFormat_;
-			texture.formats_.resource_ = surfaceFormat_;
-			texture.formats_.rtv_ = surfaceFormat_;
+			texture.format_ = properties_.surfaceFormat_;
+			texture.formats_.resource_ = properties_.surfaceFormat_;
+			texture.formats_.rtv_ = properties_.surfaceFormat_;
 			texture.desc_ = buffer->GetDesc();
-			texture.width_ = width_;
-			texture.height_ = height_;
+			texture.width_ = properties_.width_;
+			texture.height_ = properties_.height_;
 			texture.isSwapchainImage_ = true;
-			texture.isDepthFormat_ = TextureResource::IsDepthFormat( surfaceFormat_ );
-			texture.isStencilFormat_ = TextureResource::IsDepthStencilFormat( surfaceFormat_ );
+			texture.swapchain_ = swapchainHandle_;
+			texture.isDepthFormat_ = TextureResource::IsDepthFormat( properties_.surfaceFormat_ );
+			texture.isStencilFormat_ = TextureResource::IsDepthStencilFormat( properties_.surfaceFormat_ );
 			texture.rtvIndex_ = ctx_.AllocateRtvDescriptor();
 			texture.rtvHandle_ = ctx_.rtvHeap_->GetCPUDescriptorHandleForHeapStart();
 			texture.rtvHandle_.ptr += static_cast<SIZE_T>( texture.rtvIndex_ ) * ctx_.rtvDescriptorSize_;
 
 			D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-			rtvDesc.Format = surfaceFormat_;
+			rtvDesc.Format = properties_.surfaceFormat_;
 			rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 			rtvDesc.Texture2D.MipSlice = 0;
 			rtvDesc.Texture2D.PlaneSlice = 0;
@@ -186,7 +188,8 @@ namespace lightd3d12
 
 	bool Swapchain::CheckVSyncEnabled() const noexcept
 	{
-		return ctx_.swapchainDesc_.vsync;
+		const SwapchainDesc* swapchainDesc = ctx_.GetSwapchainDesc( swapchainHandle_ );
+		return swapchainDesc != nullptr ? swapchainDesc->vsync : true;
 	}
 }
 

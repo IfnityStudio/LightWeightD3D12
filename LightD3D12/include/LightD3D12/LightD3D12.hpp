@@ -29,6 +29,7 @@ namespace lightd3d12
 
 	struct BufferResource;
 	struct TextureResource;
+	struct SwapchainResource;
 
 	struct NativeWindowHandle
 	{
@@ -58,6 +59,7 @@ namespace lightd3d12
 
 	using TextureHandle = Handle<TextureResource>;
 	using BufferHandle = Handle<BufferResource>;
+	using SwapchainHandle = Handle<SwapchainResource>;
 
 	inline std::string BuildScopedCommandLabel( const char* functionSignature )
 	{
@@ -108,6 +110,13 @@ namespace lightd3d12
 		{
 			return ( static_cast< uint64_t >( submitId_ ) << 32u ) + bufferIndex_;
 		}
+	};
+
+	enum class QueueType : uint8_t
+	{
+		Graphics,
+		Compute,
+		Copy
 	};
 
 	enum class LoadOp : uint8_t
@@ -412,17 +421,19 @@ namespace lightd3d12
 	{
 	public:
 		ICommandBuffer& AcquireCommandBuffer();
-		TextureHandle GetCurrentSwapchainTexture() const;
+		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
 		SubmitHandle Submit( ICommandBuffer& buffer, TextureHandle presentTexture );
 
 		RenderPipelineState CreateRenderPipeline( const RenderPipelineDesc& desc );
 		ComputePipelineState CreateComputePipeline( const ComputePipelineDesc& desc );
 		BufferHandle CreateBuffer( const BufferDesc& desc );
 		TextureHandle CreateTexture( const TextureDesc& desc );
+		void DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
 		ID3D12Device* GetNativeDevice() const noexcept;
+		ID3D12CommandQueue* GetNativeCommandQueue() const noexcept;
 		ID3D12Resource* GetNativeTextureResource( TextureHandle texture ) const;
 		bool BindlessSupported() const noexcept;
 		void WaitIdle();
@@ -442,27 +453,42 @@ namespace lightd3d12
 	public:
 		class Impl;
 
-		DeviceManager( const ContextDesc& desc, const SwapchainDesc& swapchainDesc );
+		static DeviceManager& Initialize( const ContextDesc& desc );
+		static DeviceManager& Initialize( const ContextDesc& desc, const SwapchainDesc& primarySwapchainDesc );
+		static DeviceManager& Get();
+		static void ShutdownSingleton();
+
 		~DeviceManager();
 		DeviceManager( DeviceManager&& ) = delete;
 		DeviceManager& operator=( DeviceManager&& ) = delete;
 		DeviceManager( const DeviceManager& ) = delete;
 		DeviceManager& operator=( const DeviceManager& ) = delete;
 
+		SwapchainHandle CreateSwapchain( const SwapchainDesc& desc );
+		void DestroySwapchain( SwapchainHandle swapchain );
 		RenderDevice* GetRenderDevice() noexcept;
 		const RenderDevice* GetRenderDevice() const noexcept;
 
 		void Resize( uint32_t width, uint32_t height );
+		void Resize( SwapchainHandle swapchain, uint32_t width, uint32_t height );
 		uint32_t GetWidth() const noexcept;
+		uint32_t GetWidth( SwapchainHandle swapchain ) const noexcept;
 		uint32_t GetHeight() const noexcept;
+		uint32_t GetHeight( SwapchainHandle swapchain ) const noexcept;
 		bool IsVsyncEnabled() const noexcept;
+		bool IsVsyncEnabled( SwapchainHandle swapchain ) const noexcept;
 		void SetVsync( bool enabled ) noexcept;
+		void SetVsync( SwapchainHandle swapchain, bool enabled ) noexcept;
 		void WaitIdle();
 
 	private:
+		explicit DeviceManager( const ContextDesc& desc );
+		SwapchainHandle RequirePrimarySwapchain() const;
+
 		friend class RenderDevice;
 		friend class ImguiRenderer;
 		std::unique_ptr<Impl> impl_;
+		SwapchainHandle primarySwapchain_ = {};
 		RenderDevice renderDevice_;
 	};
 }

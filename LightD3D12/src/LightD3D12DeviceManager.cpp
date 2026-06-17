@@ -7,12 +7,52 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <mutex>
 #include <vector>
 
 namespace lightd3d12
 {
 	namespace
 	{
+		std::mutex gDeviceManagerSingletonMutex;
+		std::unique_ptr<DeviceManager> gDeviceManagerSingleton;
+		uint32_t gDeviceManagerSingletonReferenceCount = 0;
+
+		bool ContextDescsAreCompatible( const ContextDesc& left, const ContextDesc& right ) noexcept
+		{
+			return left.enableDebugLayer == right.enableDebugLayer &&
+				left.preferHighPerformanceAdapter == right.preferHighPerformanceAdapter &&
+				left.allowTearing == right.allowTearing &&
+				left.enablePixGpuCapture == right.enablePixGpuCapture &&
+				left.framesInFlight == right.framesInFlight &&
+				left.bindlessCapacity == right.bindlessCapacity &&
+				left.rtvCapacity == right.rtvCapacity &&
+				left.dsvCapacity == right.dsvCapacity &&
+				left.swapchainBufferCount == right.swapchainBufferCount &&
+				left.swapchainFormat == right.swapchainFormat &&
+				left.minimumFeatureLevel == right.minimumFeatureLevel;
+		}
+
+		void ReleaseDeviceManagerSingleton() noexcept
+		{
+			std::unique_ptr<DeviceManager> singletonToDestroy;
+			{
+				std::lock_guard lock( gDeviceManagerSingletonMutex );
+				if( gDeviceManagerSingletonReferenceCount == 0 )
+				{
+					return;
+				}
+
+				--gDeviceManagerSingletonReferenceCount;
+				if( gDeviceManagerSingletonReferenceCount == 0 )
+				{
+					singletonToDestroy = std::move( gDeviceManagerSingleton );
+				}
+			}
+
+			singletonToDestroy.reset();
+		}
+
 #if defined( LIGHTD3D12_ENABLE_PIX )
 		std::vector<uint32_t> ParseVersionComponents( const std::wstring& versionText )
 		{
@@ -148,9 +188,8 @@ namespace lightd3d12
 #endif
 	}
 
-	DeviceManager::Impl::Impl( const ContextDesc& desc, const SwapchainDesc& swapchainDesc ):
-		desc_( desc ),
-		swapchainDesc_( swapchainDesc )
+	DeviceManager::Impl::Impl( const ContextDesc& desc ):
+		desc_( desc )
 	{
 	}
 
@@ -169,23 +208,12 @@ namespace lightd3d12
 
 		InitializeFactory();
 		InitializeDevice();
-		InitializeCommandQueue();
-		detail::ThrowIfFailed( device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( queueIdleFence_.GetAddressOf() ) ), "Failed to create queue idle fence." );
-		queueIdleEvent_ = CreateEvent( nullptr, FALSE, FALSE, nullptr );
-		if( queueIdleEvent_ == nullptr )
-		{
-			throw std::runtime_error( "Failed to create queue idle event." );
-		}
+		InitializeCommandQueues();
 		InitializeDescriptorHeaps();
 		InitializeRootSignature();
 		InitializeCommandSignature();
 		baseMips_ = std::make_unique<BaseMips>( *this );
-		immediateCommands_ = std::make_unique<ImmediateCommands>(
-			device_.Get(),
-			commandQueue_.Get(),
-			std::max( std::max<uint32_t>( 1u, desc_.framesInFlight ), ourMaxActiveCommandBuffers ) );
 		stagingDevice_ = std::make_unique<StagingDevice>( *this );
-		CreateSwapchain();
 	}
 
 	void DeviceManager::Impl::InitializeFactory()
@@ -202,7 +230,7 @@ namespace lightd3d12
 			}
 		}
 #endif
-		detail::ThrowIfFailed( CreateDXGIFactory2( flags, IID_PPV_ARGS( factory_.GetAddressOf() ) ), "Failed to create DXGI factory." );
+		C_RESULT( CreateDXGIFactory2( flags, IID_PPV_ARGS( factory_.GetAddressOf() ) ), "Failed to create DXGI factory." );
 	}
 
 	void DeviceManager::Impl::InitializeDevice()
@@ -265,8 +293,8 @@ namespace lightd3d12
 		if( device_ == nullptr )
 		{
 			ComPtr<IDXGIAdapter> warpAdapter;
-			detail::ThrowIfFailed( factory_->EnumWarpAdapter( IID_PPV_ARGS( warpAdapter.GetAddressOf() ) ), "Failed to enumerate WARP adapter." );
-			detail::ThrowIfFailed( D3D12CreateDevice( warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ), "Failed to create D3D12 device." );
+			C_RESULT( factory_->EnumWarpAdapter( IID_PPV_ARGS( warpAdapter.GetAddressOf() ) ), "Failed to enumerate WARP adapter." );
+			C_RESULT( D3D12CreateDevice( warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ), "Failed to create D3D12 device." );
 		}
 
 		D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
@@ -276,11 +304,85 @@ namespace lightd3d12
 		}
 	}
 
-	void DeviceManager::Impl::InitializeCommandQueue()
+	void DeviceManager::Impl::InitializeCommandQueues()
+	{
+		#if LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		InitializeQueueContext( graphicsQueue_, D3D12_COMMAND_LIST_TYPE_DIRECT );
+		#else 
+			throw std::runtime_error("Error Lightd3d12 not multiple queue supported please use LIGHTD3D12_SINGLE_DIRECT_QUEUE define set 1");
+		#endif
+	}
+
+	void DeviceManager::Impl::InitializeQueueContext( QueueContext& context, D3D12_COMMAND_LIST_TYPE type )
 	{
 		D3D12_COMMAND_QUEUE_DESC queueDesc{};
-		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		detail::ThrowIfFailed( device_->CreateCommandQueue( &queueDesc, IID_PPV_ARGS( commandQueue_.GetAddressOf() ) ), "Failed to create command queue." );
+		queueDesc.Type = type;
+		C_RESULT( device_->CreateCommandQueue( &queueDesc, IID_PPV_ARGS( context.commandQueue_.GetAddressOf() ) ), "Failed to create command queue." );
+		C_RESULT( device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( context.queueIdleFence_.GetAddressOf() ) ), "Failed to create queue idle fence." );
+		context.queueIdleEvent_ = CreateEvent( nullptr, FALSE, FALSE, nullptr );
+		if( context.queueIdleEvent_ == nullptr )
+		{
+			throw std::runtime_error( "Failed to create queue idle event." );
+		}
+
+		context.immediateCommands_ = std::make_unique<ImmediateCommands>(
+			device_.Get(),
+			context.commandQueue_.Get(),
+			std::max( std::max<uint32_t>( 1u, desc_.framesInFlight ), ourMaxActiveCommandBuffers ) );
+	}
+
+	DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetQueueContext( QueueType type ) noexcept
+	{
+#if LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		static_cast<void>( type );
+		return graphicsQueue_;
+#else
+		switch( type )
+		{
+			case QueueType::Graphics:
+				return graphicsQueue_;
+
+			case QueueType::Compute:
+				return computeQueue_;
+
+			case QueueType::Copy:
+				return copyQueue_;
+		}
+
+		return graphicsQueue_;
+#endif
+	}
+
+	const DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetQueueContext( QueueType type ) const noexcept
+	{
+#if LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		static_cast<void>( type );
+		return graphicsQueue_;
+#else
+		switch( type )
+		{
+			case QueueType::Graphics:
+				return graphicsQueue_;
+
+			case QueueType::Compute:
+				return computeQueue_;
+
+			case QueueType::Copy:
+				return copyQueue_;
+		}
+
+		return graphicsQueue_;
+#endif
+	}
+
+	DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetGraphicsQueueContext() noexcept
+	{
+		return GetQueueContext( QueueType::Graphics );
+	}
+
+	const DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetGraphicsQueueContext() const noexcept
+	{
+		return GetQueueContext( QueueType::Graphics );
 	}
 
 	void DeviceManager::Impl::InitializeDescriptorHeaps()
@@ -289,17 +391,17 @@ namespace lightd3d12
 		bindlessDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		bindlessDesc.NumDescriptors = desc_.bindlessCapacity;
 		bindlessDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		detail::ThrowIfFailed( device_->CreateDescriptorHeap( &bindlessDesc, IID_PPV_ARGS( bindlessHeap_.GetAddressOf() ) ), "Failed to create bindless heap." );
+		C_RESULT( device_->CreateDescriptorHeap( &bindlessDesc, IID_PPV_ARGS( bindlessHeap_.GetAddressOf() ) ), "Failed to create bindless heap." );
 
 		D3D12_DESCRIPTOR_HEAP_DESC rtvDesc{};
 		rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvDesc.NumDescriptors = desc_.rtvCapacity;
-		detail::ThrowIfFailed( device_->CreateDescriptorHeap( &rtvDesc, IID_PPV_ARGS( rtvHeap_.GetAddressOf() ) ), "Failed to create RTV heap." );
+		C_RESULT( device_->CreateDescriptorHeap( &rtvDesc, IID_PPV_ARGS( rtvHeap_.GetAddressOf() ) ), "Failed to create RTV heap." );
 
 		D3D12_DESCRIPTOR_HEAP_DESC dsvDesc{};
 		dsvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		dsvDesc.NumDescriptors = desc_.dsvCapacity;
-		detail::ThrowIfFailed( device_->CreateDescriptorHeap( &dsvDesc, IID_PPV_ARGS( dsvHeap_.GetAddressOf() ) ), "Failed to create DSV heap." );
+		C_RESULT( device_->CreateDescriptorHeap( &dsvDesc, IID_PPV_ARGS( dsvHeap_.GetAddressOf() ) ), "Failed to create DSV heap." );
 
 		bindlessDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV );
 		rtvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
@@ -361,8 +463,8 @@ namespace lightd3d12
 
 		ComPtr<ID3DBlob> serialized;
 		ComPtr<ID3DBlob> errors;
-		detail::ThrowIfFailed( D3D12SerializeVersionedRootSignature( &rootDesc, serialized.GetAddressOf(), errors.GetAddressOf() ), "Failed to serialize root signature." );
-		detail::ThrowIfFailed(
+		C_RESULT( D3D12SerializeVersionedRootSignature( &rootDesc, serialized.GetAddressOf(), errors.GetAddressOf() ), "Failed to serialize root signature." );
+		C_RESULT(
 			device_->CreateRootSignature( 0, serialized->GetBufferPointer(), serialized->GetBufferSize(), IID_PPV_ARGS( rootSignature_.GetAddressOf() ) ),
 			"Failed to create root signature." );
 	}
@@ -380,7 +482,7 @@ namespace lightd3d12
 		signatureDesc.NumArgumentDescs = 2;
 		signatureDesc.pArgumentDescs = arguments;
 
-		detail::ThrowIfFailed(
+		C_RESULT(
 			device_->CreateCommandSignature( &signatureDesc, rootSignature_.Get(), IID_PPV_ARGS( commandSignature_.GetAddressOf() ) ),
 			"Failed to create command signature." );
 	}
@@ -541,62 +643,89 @@ namespace lightd3d12
 
 	void DeviceManager::Impl::AddDeferredRelease( SubmitHandle handle, std::function<void()>&& release )
 	{
-		deferredReleases_.push_back( { handle, std::move( release ) } );
+		GetGraphicsQueueContext().deferredReleases_.push_back( { handle, std::move( release ) } );
 	}
 
 	void DeviceManager::Impl::ProcessDeferredReleases()
 	{
-		while( !deferredReleases_.empty() )
+		ProcessDeferredReleases( GetGraphicsQueueContext() );
+	}
+
+	void DeviceManager::Impl::ProcessDeferredReleases( QueueContext& context )
+	{
+		while( !context.deferredReleases_.empty() )
 		{
-			if( !immediateCommands_->IsReady( deferredReleases_.front().handle_ ) )
+			if( context.immediateCommands_ == nullptr || !context.immediateCommands_->IsReady( context.deferredReleases_.front().handle_ ) )
 			{
 				break;
 			}
 
-			deferredReleases_.front().release_();
-			deferredReleases_.pop_front();
+			context.deferredReleases_.front().release_();
+			context.deferredReleases_.pop_front();
 		}
 	}
 
 	void DeviceManager::Impl::WaitForQueueIdle()
 	{
-		if( commandQueue_ == nullptr || queueIdleFence_ == nullptr )
+		WaitForQueueIdle( GetGraphicsQueueContext() );
+	}
+
+	void DeviceManager::Impl::WaitForQueueIdle( QueueContext& context )
+	{
+		if( context.commandQueue_ == nullptr || context.queueIdleFence_ == nullptr )
 		{
 			return;
 		}
 
-		queueIdleFenceValue_++;
-		detail::ThrowIfFailed( commandQueue_->Signal( queueIdleFence_.Get(), queueIdleFenceValue_ ), "Failed to signal queue idle fence." );
-		if( queueIdleFence_->GetCompletedValue() < queueIdleFenceValue_ )
+		context.queueIdleFenceValue_++;
+		C_RESULT( context.commandQueue_->Signal( context.queueIdleFence_.Get(), context.queueIdleFenceValue_ ), "Failed to signal queue idle fence." );
+		if( context.queueIdleFence_->GetCompletedValue() < context.queueIdleFenceValue_ )
 		{
-			detail::ThrowIfFailed( queueIdleFence_->SetEventOnCompletion( queueIdleFenceValue_, queueIdleEvent_ ), "Failed to wait for queue idle fence." );
-			WaitForSingleObject( queueIdleEvent_, INFINITE );
+			C_RESULT( context.queueIdleFence_->SetEventOnCompletion( context.queueIdleFenceValue_, context.queueIdleEvent_ ), "Failed to wait for queue idle fence." );
+			WaitForSingleObject( context.queueIdleEvent_, INFINITE );
 		}
 	}
 
 	void DeviceManager::Impl::WaitIdle()
 	{
-		if( immediateCommands_ )
+		auto waitQueueIdle = [ this ]( QueueContext& context )
 		{
-			immediateCommands_->WaitAll();
-		}
+			if( context.immediateCommands_ )
+			{
+				context.immediateCommands_->WaitAll();
+			}
 
-		WaitForQueueIdle();
+			WaitForQueueIdle( context );
+			ProcessDeferredReleases( context );
+			while( !context.deferredReleases_.empty() )
+			{
+				context.deferredReleases_.front().release_();
+				context.deferredReleases_.pop_front();
+			}
+		};
 
-		ProcessDeferredReleases();
-		while( !deferredReleases_.empty() )
-		{
-			deferredReleases_.front().release_();
-			deferredReleases_.pop_front();
-		}
+		waitQueueIdle( graphicsQueue_ );
+#if !LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		waitQueueIdle( computeQueue_ );
+		waitQueueIdle( copyQueue_ );
+#endif
 	}
 
 	void DeviceManager::Impl::Shutdown() noexcept
 	{
-		for( auto& activeCommandBuffer : activeCommandBuffers_ )
+		auto resetActiveBuffers = []( QueueContext& context )
 		{
-			activeCommandBuffer.reset();
-		}
+			for( auto& activeCommandBuffer : context.activeCommandBuffers_ )
+			{
+				activeCommandBuffer.reset();
+			}
+		};
+
+		resetActiveBuffers( graphicsQueue_ );
+#if !LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		resetActiveBuffers( computeQueue_ );
+		resetActiveBuffers( copyQueue_ );
+#endif
 
 		try
 		{
@@ -607,7 +736,11 @@ namespace lightd3d12
 		}
 
 		stagingDevice_.reset();
-		immediateCommands_.reset();
+		graphicsQueue_.immediateCommands_.reset();
+#if !LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		computeQueue_.immediateCommands_.reset();
+		copyQueue_.immediateCommands_.reset();
+#endif
 		baseMips_.reset();
 
 		for( auto* buffer : slotMapBuffers_.GetAll() )
@@ -619,11 +752,16 @@ namespace lightd3d12
 			}
 		}
 
-		if( swapchain_ != nullptr )
+		for( auto* swapchainResource : slotMapSwapchains_.GetAll() )
 		{
-			const HWND hwnd = detail::GetHwnd( swapchainDesc_.window );
+			if( swapchainResource == nullptr || swapchainResource->swapchain_ == nullptr )
+			{
+				continue;
+			}
+
+			const HWND hwnd = detail::GetHwnd( swapchainResource->desc_.window );
 			const bool hasLiveWindow = hwnd != nullptr && IsWindow( hwnd ) != FALSE;
-			IDXGISwapChain4* nativeSwapchain = swapchain_->GetSwapchain();
+			IDXGISwapChain4* nativeSwapchain = swapchainResource->swapchain_->GetSwapchain();
 			if( factory_ != nullptr && hasLiveWindow )
 			{
 				factory_->MakeWindowAssociation( hwnd, 0 );
@@ -637,25 +775,38 @@ namespace lightd3d12
 				}
 			}
 		}
-		swapchain_.reset();
+		slotMapSwapchains_.Clear();
 
 		slotMapTextures_.Clear();
 		slotMapBuffers_.Clear();
-		deferredReleases_.clear();
+		graphicsQueue_.deferredReleases_.clear();
+#if !LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		computeQueue_.deferredReleases_.clear();
+		copyQueue_.deferredReleases_.clear();
+#endif
 
 		commandSignature_.Reset();
 		rootSignature_.Reset();
 		dsvHeap_.Reset();
 		rtvHeap_.Reset();
 		bindlessHeap_.Reset();
-		queueIdleFence_.Reset();
-		if( queueIdleEvent_ != nullptr )
+		auto releaseQueueContext = []( QueueContext& context )
 		{
-			CloseHandle( queueIdleEvent_ );
-			queueIdleEvent_ = nullptr;
-		}
+			context.queueIdleFence_.Reset();
+			if( context.queueIdleEvent_ != nullptr )
+			{
+				CloseHandle( context.queueIdleEvent_ );
+				context.queueIdleEvent_ = nullptr;
+			}
 
-		commandQueue_.Reset();
+			context.commandQueue_.Reset();
+		};
+
+		releaseQueueContext( graphicsQueue_ );
+#if !LIGHTD3D12_SINGLE_DIRECT_QUEUE
+		releaseQueueContext( computeQueue_ );
+		releaseQueueContext( copyQueue_ );
+#endif
 		device_.Reset();
 		adapter_.Reset();
 		factory_.Reset();
@@ -680,39 +831,168 @@ namespace lightd3d12
 #endif
 	}
 
-	void DeviceManager::Impl::CreateSwapchain()
+	SwapchainHandle DeviceManager::Impl::CreateSwapchain( const SwapchainDesc& desc )
 	{
-		swapchain_ = std::make_unique<Swapchain>(
-			*this,
-			detail::GetHwnd( swapchainDesc_.window ),
-			swapchainDesc_.width,
-			swapchainDesc_.height );
+		SwapchainResource swapchainResource{};
+		swapchainResource.desc_ = desc;
+		const SwapchainHandle handle = slotMapSwapchains_.Create( std::move( swapchainResource ) );
+		auto* resource = slotMapSwapchains_.Get( handle );
+		if( resource == nullptr )
+		{
+			throw std::runtime_error( "Failed to allocate swapchain slot." );
+		}
+
+		try
+		{
+			resource->swapchain_ = std::make_unique<Swapchain>(
+				*this,
+				handle,
+				detail::GetHwnd( desc.window ),
+				desc.width,
+				desc.height );
+		}
+		catch( ... )
+		{
+			slotMapSwapchains_.Destroy( handle );
+			throw;
+		}
+
+		return handle;
 	}
 
-	void DeviceManager::Impl::Resize( uint32_t width, uint32_t height )
+	void DeviceManager::Impl::DestroySwapchain( SwapchainHandle swapchain ) noexcept
 	{
-		if( width == 0 || height == 0 )
+		auto* resource = slotMapSwapchains_.Get( swapchain );
+		if( resource == nullptr )
 		{
 			return;
 		}
 
-		WaitIdle();
-		swapchainDesc_.width = width;
-		swapchainDesc_.height = height;
-		if( swapchain_ != nullptr )
-		{
-			swapchain_->Resize( width, height );
-		}
+		resource->swapchain_.reset();
+		slotMapSwapchains_.Destroy( swapchain );
 	}
 
-	DeviceManager::DeviceManager( const ContextDesc& desc, const SwapchainDesc& swapchainDesc ):
-		impl_( std::make_unique<Impl>( desc, swapchainDesc ) ),
+	Swapchain* DeviceManager::Impl::GetSwapchain( SwapchainHandle swapchain ) noexcept
+	{
+		auto* resource = slotMapSwapchains_.Get( swapchain );
+		return resource != nullptr ? resource->swapchain_.get() : nullptr;
+	}
+
+	const Swapchain* DeviceManager::Impl::GetSwapchain( SwapchainHandle swapchain ) const noexcept
+	{
+		const auto* resource = slotMapSwapchains_.Get( swapchain );
+		return resource != nullptr ? resource->swapchain_.get() : nullptr;
+	}
+
+	SwapchainDesc* DeviceManager::Impl::GetSwapchainDesc( SwapchainHandle swapchain ) noexcept
+	{
+		auto* resource = slotMapSwapchains_.Get( swapchain );
+		return resource != nullptr ? &resource->desc_ : nullptr;
+	}
+
+	const SwapchainDesc* DeviceManager::Impl::GetSwapchainDesc( SwapchainHandle swapchain ) const noexcept
+	{
+		const auto* resource = slotMapSwapchains_.Get( swapchain );
+		return resource != nullptr ? &resource->desc_ : nullptr;
+	}
+
+	Swapchain* DeviceManager::Impl::GetOwningSwapchain( TextureHandle texture ) noexcept
+	{
+		const auto* resource = slotMapTextures_.Get( texture );
+		if( resource == nullptr || !resource->swapchain_.Valid() )
+		{
+			return nullptr;
+		}
+
+		return GetSwapchain( resource->swapchain_ );
+	}
+
+	DeviceManager::DeviceManager( const ContextDesc& desc ):
+		impl_( std::make_unique<Impl>( desc ) ),
 		renderDevice_( *this )
 	{
 		impl_->Initialize();
 	}
 
+	DeviceManager& DeviceManager::Initialize( const ContextDesc& desc )
+	{
+		std::lock_guard lock( gDeviceManagerSingletonMutex );
+		if( gDeviceManagerSingleton == nullptr )
+		{
+			gDeviceManagerSingleton = std::unique_ptr<DeviceManager>( new DeviceManager( desc ) );
+		}
+		else if( !ContextDescsAreCompatible( gDeviceManagerSingleton->impl_->desc_, desc ) )
+		{
+			throw std::runtime_error( "DeviceManager singleton already initialized with an incompatible ContextDesc." );
+		}
+
+		++gDeviceManagerSingletonReferenceCount;
+		return *gDeviceManagerSingleton;
+	}
+
+	DeviceManager& DeviceManager::Initialize( const ContextDesc& desc, const SwapchainDesc& primarySwapchainDesc )
+	{
+		DeviceManager& manager = Initialize( desc );
+		try
+		{
+			if( !manager.primarySwapchain_.Valid() )
+			{
+				manager.primarySwapchain_ = manager.CreateSwapchain( primarySwapchainDesc );
+			}
+		}
+		catch( ... )
+		{
+			ReleaseDeviceManagerSingleton();
+			throw;
+		}
+
+		return manager;
+	}
+
+
+	DeviceManager& DeviceManager::Get()
+	{
+          DeviceManager* manager = gDeviceManagerSingleton.get();
+		if( manager == nullptr )
+		{
+			throw std::runtime_error( "DeviceManager singleton is not initialized." );
+		}
+
+		return *manager;
+	}
+
+	void DeviceManager::ShutdownSingleton()
+	{
+		ReleaseDeviceManagerSingleton();
+	}
+
 	DeviceManager::~DeviceManager() = default;
+
+	SwapchainHandle DeviceManager::CreateSwapchain( const SwapchainDesc& desc )
+	{
+		const SwapchainHandle handle = impl_->CreateSwapchain( desc );
+		if( !primarySwapchain_.Valid() )
+		{
+			primarySwapchain_ = handle;
+		}
+
+		return handle;
+	}
+
+	void DeviceManager::DestroySwapchain( SwapchainHandle swapchain )
+	{
+		if( !swapchain.Valid() || impl_ == nullptr )
+		{
+			return;
+		}
+
+		WaitIdle();
+		impl_->DestroySwapchain( swapchain );
+		if( primarySwapchain_ == swapchain )
+		{
+			primarySwapchain_ = {};
+		}
+	}
 
 	RenderDevice* DeviceManager::GetRenderDevice() noexcept
 	{
@@ -724,29 +1004,81 @@ namespace lightd3d12
 		return &renderDevice_;
 	}
 
+	SwapchainHandle DeviceManager::RequirePrimarySwapchain() const
+	{
+		return primarySwapchain_;
+	}
+
 	void DeviceManager::Resize( uint32_t width, uint32_t height )
 	{
-		impl_->Resize( width, height );
+		Resize( primarySwapchain_, width, height );
+	}
+
+	void DeviceManager::Resize( SwapchainHandle swapchain, uint32_t width, uint32_t height )
+	{
+		if( width == 0 || height == 0 || impl_ == nullptr )
+		{
+			return;
+		}
+
+		SwapchainDesc* swapchainDesc = impl_->GetSwapchainDesc( swapchain );
+		Swapchain* nativeSwapchain = impl_->GetSwapchain( swapchain );
+		if( swapchainDesc == nullptr || nativeSwapchain == nullptr )
+		{
+			return;
+		}
+
+		WaitIdle();
+		swapchainDesc->width = width;
+		swapchainDesc->height = height;
+		nativeSwapchain->Resize( width, height );
 	}
 
 	uint32_t DeviceManager::GetWidth() const noexcept
 	{
-		return impl_->swapchainDesc_.width;
+		return GetWidth( primarySwapchain_ );
+	}
+
+	uint32_t DeviceManager::GetWidth( SwapchainHandle swapchain ) const noexcept
+	{
+		const SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		return swapchainDesc != nullptr ? swapchainDesc->width : 0u;
 	}
 
 	uint32_t DeviceManager::GetHeight() const noexcept
 	{
-		return impl_->swapchainDesc_.height;
+		return GetHeight( primarySwapchain_ );
+	}
+
+	uint32_t DeviceManager::GetHeight( SwapchainHandle swapchain ) const noexcept
+	{
+		const SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		return swapchainDesc != nullptr ? swapchainDesc->height : 0u;
 	}
 
 	bool DeviceManager::IsVsyncEnabled() const noexcept
 	{
-		return impl_->swapchainDesc_.vsync;
+		return IsVsyncEnabled( primarySwapchain_ );
+	}
+
+	bool DeviceManager::IsVsyncEnabled( SwapchainHandle swapchain ) const noexcept
+	{
+		const SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		return swapchainDesc != nullptr ? swapchainDesc->vsync : true;
 	}
 
 	void DeviceManager::SetVsync( bool enabled ) noexcept
 	{
-		impl_->swapchainDesc_.vsync = enabled;
+		SetVsync( primarySwapchain_, enabled );
+	}
+
+	void DeviceManager::SetVsync( SwapchainHandle swapchain, bool enabled ) noexcept
+	{
+		SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		if( swapchainDesc != nullptr )
+		{
+			swapchainDesc->vsync = enabled;
+		}
 	}
 
 	void DeviceManager::WaitIdle()

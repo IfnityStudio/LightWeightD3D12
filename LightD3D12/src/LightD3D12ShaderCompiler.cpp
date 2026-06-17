@@ -345,11 +345,11 @@ namespace lightd3d12
 
 		ComPtr<IDxcUtils> utils;
 		ComPtr<IDxcCompiler3> compiler;
-		detail::ThrowIfFailed( createInstance( CLSID_DxcUtils, __uuidof( IDxcUtils ), reinterpret_cast<void**>( utils.GetAddressOf() ) ), "Failed to create IDxcUtils." );
-		detail::ThrowIfFailed( createInstance( CLSID_DxcCompiler, __uuidof( IDxcCompiler3 ), reinterpret_cast<void**>( compiler.GetAddressOf() ) ), "Failed to create IDxcCompiler3." );
+		C_RESULT( createInstance( CLSID_DxcUtils, __uuidof( IDxcUtils ), reinterpret_cast<void**>( utils.GetAddressOf() ) ), "Failed to create IDxcUtils." );
+		C_RESULT( createInstance( CLSID_DxcCompiler, __uuidof( IDxcCompiler3 ), reinterpret_cast<void**>( compiler.GetAddressOf() ) ), "Failed to create IDxcCompiler3." );
 
 		ComPtr<IDxcIncludeHandler> includeHandler;
-		detail::ThrowIfFailed( utils->CreateDefaultIncludeHandler( includeHandler.GetAddressOf() ), "Failed to create DXC include handler." );
+		C_RESULT( utils->CreateDefaultIncludeHandler( includeHandler.GetAddressOf() ), "Failed to create DXC include handler." );
 
 		const std::wstring entryPoint = ToWide( stage.entryPoint != nullptr ? stage.entryPoint : "main" );
 		const std::wstring targetProfile = ToWide( profile );
@@ -385,7 +385,7 @@ namespace lightd3d12
 		sourceBuffer.Encoding = DXC_CP_UTF8;
 
 		ComPtr<IDxcResult> result;
-		detail::ThrowIfFailed(
+		C_RESULT(
 			compiler->Compile(
 				&sourceBuffer,
 				arguments.data(),
@@ -396,7 +396,7 @@ namespace lightd3d12
 			"Failed to invoke DXC shader compilation." );
 
 		HRESULT status = S_OK;
-		detail::ThrowIfFailed( result->GetStatus( &status ), "Failed to query DXC compilation status." );
+		C_RESULT( result->GetStatus( &status ), "Failed to query DXC compilation status." );
 		if( FAILED( status ) )
 		{
 			ComPtr<IDxcBlobUtf8> errors;
@@ -409,7 +409,7 @@ namespace lightd3d12
 		}
 
 		CompiledShader compiledShader;
-		detail::ThrowIfFailed(
+		C_RESULT(
 			result->GetOutput( DXC_OUT_OBJECT, __uuidof( IDxcBlob ), reinterpret_cast<void**>( compiledShader.dxcBlob_.GetAddressOf() ), nullptr ),
 			"Failed to retrieve DXC shader bytecode." );
 
