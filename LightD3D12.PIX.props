@@ -3,6 +3,7 @@
   <PropertyGroup Label="UserMacros">
     <LightD3D12EnablePix Condition="'$(LightD3D12EnablePix)'==''">false</LightD3D12EnablePix>
     <LightD3D12PixRuntimeDir Condition="'$(LightD3D12PixRuntimeDir)'=='' and '$(PIX_EVENT_RUNTIME_DIR)'!=''">$(PIX_EVENT_RUNTIME_DIR)</LightD3D12PixRuntimeDir>
+    <LightD3D12PixRuntimeDir Condition="'$(LightD3D12PixRuntimeDir)'=='' and '$(VcpkgInstalledDir)'!='' and Exists('$(VcpkgInstalledDir)bin\WinPixEventRuntime.dll')">$(VcpkgInstalledDir)bin</LightD3D12PixRuntimeDir>
     <LightD3D12PixRuntimeDir Condition="'$(LightD3D12PixRuntimeDir)'==''"></LightD3D12PixRuntimeDir>
     <LightD3D12PixCapturerDir Condition="'$(LightD3D12PixCapturerDir)'=='' and '$(PIX_GPU_CAPTURER_DIR)'!=''">$(PIX_GPU_CAPTURER_DIR)</LightD3D12PixCapturerDir>
     <LightD3D12PixCapturerDir Condition="'$(LightD3D12PixCapturerDir)'==''"></LightD3D12PixCapturerDir>
