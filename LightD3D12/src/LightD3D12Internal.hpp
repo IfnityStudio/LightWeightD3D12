@@ -15,14 +15,33 @@
 #include <dxgidebug.h>
 #endif
 
+#ifndef LIGHTD3D12_SINGLE_DIRECT_QUEUE
+#define LIGHTD3D12_SINGLE_DIRECT_QUEUE 1
+#endif
+
 namespace lightd3d12::detail
 {
-	inline void ThrowIfFailed( HRESULT hr, const char* message )
+	inline HRESULT CheckResult( HRESULT hr, const char* expression, const char* message )
 	{
 		if( FAILED( hr ) )
 		{
-			throw std::runtime_error( message );
+			std::string error = message != nullptr && message[ 0 ] != '\0' ? std::string( message ) : std::string( "HRESULT call failed." );
+			if( expression != nullptr && expression[ 0 ] != '\0' )
+			{
+				error += " [";
+				error += expression;
+				error += "]";
+			}
+
+			throw std::runtime_error( error );
 		}
+
+		return hr;
+	}
+
+	inline void ThrowIfFailed( HRESULT hr, const char* message )
+	{
+		static_cast<void>( CheckResult( hr, nullptr, message ) );
 	}
 
 	inline std::wstring ToWide( const std::string& value )
@@ -56,3 +75,5 @@ namespace lightd3d12::detail
 		return (value + 255u) & ~255u;
 	}
 }
+
+#define C_RESULT( expression, message ) ::lightd3d12::detail::CheckResult( ( expression ), #expression, ( message ) )

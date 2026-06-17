@@ -351,10 +351,10 @@ namespace lightd3d12
 		}
 
 		SubmitFixupResources fixup;
-		detail::ThrowIfFailed(
+		C_RESULT(
 			manager_.device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( fixup.allocator_.GetAddressOf() ) ),
 			"Failed to create command allocator for submit fixup." );
-		detail::ThrowIfFailed(
+		C_RESULT(
 			manager_.device_->CreateCommandList(
 				0,
 				D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -378,7 +378,7 @@ namespace lightd3d12
 			fixup.commandList_->ResourceBarrier( 1, &barrier );
 		}
 
-		detail::ThrowIfFailed( fixup.commandList_->Close(), "Failed to close submit fixup command list." );
+		C_RESULT( fixup.commandList_->Close(), "Failed to close submit fixup command list." );
 		return fixup;
 	}
 

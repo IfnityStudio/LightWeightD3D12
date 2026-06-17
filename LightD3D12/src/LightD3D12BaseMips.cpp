@@ -73,7 +73,7 @@ namespace lightd3d12
 		psoDesc.pRootSignature = manager_.rootSignature_.Get();
 		psoDesc.CS = shader.Bytecode();
 
-		detail::ThrowIfFailed(
+		C_RESULT(
 			manager_.device_->CreateComputePipelineState( &psoDesc, IID_PPV_ARGS( pipelineState_.GetAddressOf() ) ),
 			"Failed to create BaseMips compute pipeline state." );
 	}
@@ -90,7 +90,8 @@ namespace lightd3d12
 			throw std::runtime_error( "BaseMips requires a valid SRV and destination mip UAV range." );
 		}
 
-		auto& wrapper = manager_.immediateCommands_->Acquire();
+		auto& queue = manager_.GetGraphicsQueueContext();
+		auto& wrapper = queue.immediateCommands_->Acquire();
 		ID3D12GraphicsCommandList4* commandList = wrapper.commandList_.Get();
 
 		ID3D12DescriptorHeap* descriptorHeaps[] = { manager_.bindlessHeap_.Get() };
@@ -165,9 +166,9 @@ namespace lightd3d12
 				finalState );
 		}
 
-		const SubmitHandle handle = manager_.immediateCommands_->Submit( wrapper );
+		const SubmitHandle handle = queue.immediateCommands_->Submit( wrapper );
 		manager_.ProcessDeferredReleases();
-		manager_.immediateCommands_->Wait( handle );
+		queue.immediateCommands_->Wait( handle );
 	}
 
 	void BaseMips::TransitionSubresource(
