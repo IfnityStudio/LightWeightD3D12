@@ -52,6 +52,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SphericalHarmonicsSimple", 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiWindow", "samples\MultiWindow\MultiWindow.vcxproj", "{CDD58DA8-01EB-4F1A-9616-765F215E0369}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SdkMeshPowerplant", "samples\SdkMeshPowerplant\SdkMeshPowerplant.vcxproj", "{5772D606-07E5-4498-9A4E-8DD04565B637}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12WpfNative", "bindings\LightD3D12WpfNative\LightD3D12WpfNative.vcxproj", "{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WpfTriangle", "samples\WpfTriangle\WpfTriangle.csproj", "{58BA7B56-4211-4C1E-A01F-00501854660B}"
@@ -171,6 +173,10 @@ Global
 		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Debug|x64.Build.0 = Debug|x64
 		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Release|x64.ActiveCfg = Release|x64
 		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Release|x64.Build.0 = Release|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Debug|x64.ActiveCfg = Debug|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Debug|x64.Build.0 = Debug|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Release|x64.ActiveCfg = Release|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Release|x64.Build.0 = Release|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.ActiveCfg = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.Build.0 = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Release|x64.ActiveCfg = Release|x64

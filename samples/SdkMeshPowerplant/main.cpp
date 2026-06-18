@@ -55,6 +55,85 @@ namespace
 		POINT lastMouse = {};
 		bool running = true;
 		bool minimized = false;
+		bool imguiMessageReady = false;
+	};
+
+	struct WindowUserDataScope
+	{
+		explicit WindowUserDataScope( HWND hwnd ) noexcept:
+			hwnd_( hwnd )
+		{
+		}
+
+		~WindowUserDataScope()
+		{
+			Clear();
+		}
+
+		void Set( void* userData ) noexcept
+		{
+			if( hwnd_ == nullptr )
+			{
+				return;
+			}
+
+			SetWindowLongPtr( hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( userData ) );
+			active_ = true;
+		}
+
+		void Clear() noexcept
+		{
+			if( !active_ || hwnd_ == nullptr )
+			{
+				return;
+			}
+
+			if( IsWindow( hwnd_ ) != FALSE )
+			{
+				SetWindowLongPtr( hwnd_, GWLP_USERDATA, 0 );
+			}
+
+			active_ = false;
+		}
+
+		HWND hwnd_ = nullptr;
+		bool active_ = false;
+	};
+
+	struct FallbackEffectTextureFactory final : IEffectTextureFactory
+	{
+		FallbackEffectTextureFactory(
+			EffectTextureFactory& factory,
+			std::wstring fallbackTexture,
+			std::wstring fallbackNormalTexture ) noexcept:
+			factory_( factory ),
+			fallbackTexture_( std::move( fallbackTexture ) ),
+			fallbackNormalTexture_( std::move( fallbackNormalTexture ) )
+		{
+		}
+
+		size_t CreateTexture( const wchar_t* name, int descriptorIndex ) override
+		{
+			try
+			{
+				return factory_.CreateTexture( name, descriptorIndex );
+			}
+			catch( const std::exception& )
+			{
+				const std::wstring requestedTexture = name != nullptr ? std::wstring( name ) : std::wstring();
+				const std::wstring& fallbackTexture = requestedTexture == L"default-normalmap.dds" ? fallbackNormalTexture_ : fallbackTexture_;
+				if( fallbackTexture.empty() || requestedTexture == fallbackTexture )
+				{
+					throw;
+				}
+
+				return factory_.CreateTexture( fallbackTexture.c_str(), descriptorIndex );
+			}
+		}
+
+		EffectTextureFactory& factory_;
+		std::wstring fallbackTexture_;
+		std::wstring fallbackNormalTexture_;
 	};
 
 	std::filesystem::path GetExecutableDirectory()
@@ -139,21 +218,14 @@ namespace
 		app.graphicsMemory = std::make_unique<GraphicsMemory>( device );
 		app.commonStates = std::make_unique<CommonStates>( device );
 		app.model = Model::CreateFromSDKMESH( device, app.modelPath.c_str(), ModelLoader_AllowLargeModels );
-		for( auto& material : app.model->materials )
-		{
-			material.normalTextureIndex = -1;
-		}
-		for( auto& textureName : app.model->textureNames )
-		{
-			if( !std::filesystem::exists( app.mediaPath / textureName ) )
-			{
-				textureName = L"test_ground_b.dds";
-			}
-		}
 
 		ResourceUploadBatch upload( device );
 		upload.Begin();
-		app.textureFactory = app.model->LoadTextures( device, upload, app.mediaPath.c_str() );
+		const size_t descriptorCount = std::max<size_t>( 1u, app.model->textureNames.size() );
+		app.textureFactory = std::make_unique<EffectTextureFactory>( device, upload, descriptorCount );
+		app.textureFactory->SetDirectory( app.mediaPath.c_str() );
+		FallbackEffectTextureFactory fallbackTextureFactory( *app.textureFactory, L"test_ground_b.dds", L"test_ground_b.dds" );
+		app.model->LoadTextures( fallbackTextureFactory );
 		app.model->LoadStaticBuffers( device, upload );
 
 		const RenderTargetState rtState( colorFormat, depthFormat );
@@ -264,7 +336,7 @@ namespace
 	{
 		auto* app = reinterpret_cast<AppState*>( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
 
-		if( app != nullptr && app->imguiRenderer && app->imguiRenderer->ProcessMessage( hwnd, message, wParam, lParam ) )
+		if( app != nullptr && app->imguiMessageReady && app->imguiRenderer && app->imguiRenderer->ProcessMessage( hwnd, message, wParam, lParam ) )
 		{
 			return 1;
 		}
@@ -383,10 +455,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		UpdateWindow( hwnd );
 
 		AppState app{};
+		WindowUserDataScope windowUserData( hwnd );
 		const std::filesystem::path repoRoot = FindRepoRoot();
 		app.mediaPath = repoRoot / "Media" / "powerplant";
 		app.modelPath = app.mediaPath / "powerplant.sdkmesh";
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
@@ -400,6 +472,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
+		app.imguiMessageReady = true;
+		windowUserData.Set( &app );
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
 		LoadPowerplantModel( app, ctx, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT );
 		RecreateDepthTarget( app );
@@ -490,7 +564,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			app.graphicsMemory->Commit( renderDevice->GetNativeCommandQueue() );
 		}
 
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
+		app.imguiMessageReady = false;
+		windowUserData.Clear();
 		ctx.WaitIdle();
 		DestroyDepthTarget( ctx, app.depth );
 		app.effects.clear();

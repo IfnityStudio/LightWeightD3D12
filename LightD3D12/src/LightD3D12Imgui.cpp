@@ -13,6 +13,7 @@
 #include <stdexcept>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam );
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandlerEx( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, ImGuiIO& io );
 
 namespace lightd3d12
 {
@@ -152,7 +153,7 @@ namespace lightd3d12
 			}
 		}
 
-		bool ProcessMessage( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
+		bool HasPlatformBackend() const noexcept
 		{
 			if( !initialized_ || context_ == nullptr )
 			{
@@ -160,7 +161,41 @@ namespace lightd3d12
 			}
 
 			MakeCurrent();
-			return ImGui_ImplWin32_WndProcHandler( hwnd, message, wParam, lParam ) != 0;
+			if( ImGui::GetCurrentContext() != context_ )
+			{
+				return false;
+			}
+
+			ImGuiIO& io = ImGui::GetIO();
+			return io.BackendPlatformUserData != nullptr;
+		}
+
+		bool HasRendererBackend() const noexcept
+		{
+			if( !initialized_ || context_ == nullptr )
+			{
+				return false;
+			}
+
+			MakeCurrent();
+			if( ImGui::GetCurrentContext() != context_ )
+			{
+				return false;
+			}
+
+			ImGuiIO& io = ImGui::GetIO();
+			return io.BackendRendererUserData != nullptr;
+		}
+
+		bool ProcessMessage( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
+		{
+			if( !HasPlatformBackend() )
+			{
+				return false;
+			}
+
+			ImGuiIO& io = ImGui::GetIO();
+			return ImGui_ImplWin32_WndProcHandlerEx( hwnd, message, wParam, lParam, io ) != 0;
 		}
 
 		static void AllocateSrvDescriptor( ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* outCpuDescriptor, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuDescriptor )
@@ -209,12 +244,11 @@ namespace lightd3d12
 
 	void ImguiRenderer::NewFrame()
 	{
-		if( impl_ == nullptr )
+		if( impl_ == nullptr || !impl_->HasPlatformBackend() || !impl_->HasRendererBackend() )
 		{
 			return;
 		}
 
-		impl_->MakeCurrent();
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -222,12 +256,11 @@ namespace lightd3d12
 
 	void ImguiRenderer::Render( ICommandBuffer& commandBuffer )
 	{
-		if( impl_ == nullptr )
+		if( impl_ == nullptr || !impl_->HasRendererBackend() )
 		{
 			return;
 		}
 
-		impl_->MakeCurrent();
 		ImGui::Render();
 
 		auto* commandBufferImpl = dynamic_cast< CommandBufferImpl* >( &commandBuffer );

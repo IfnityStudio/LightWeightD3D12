@@ -43,6 +43,9 @@
   <Import Project="$(SolutionDir)LightD3D12.PIX.props" Condition="exists('$(SolutionDir)LightD3D12.PIX.props')" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
+    <VcpkgTriplet Condition="'$(VcpkgTriplet)'==''">x64-windows</VcpkgTriplet>
+    <LightD3D12DirectXTK12Root Condition="Exists('$(VcpkgInstalledDir)$(VcpkgTriplet)\\debug\\bin\\DirectXTK12.dll')">$(VcpkgInstalledDir)$(VcpkgTriplet)\</LightD3D12DirectXTK12Root>
+    <LightD3D12DirectXTK12Root Condition="'$(LightD3D12DirectXTK12Root)'=='' and Exists('$(VcpkgInstalledDir)debug\\bin\\DirectXTK12.dll')">$(VcpkgInstalledDir)</LightD3D12DirectXTK12Root>
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <TargetName>LightD3D12SdkMeshPowerplant</TargetName>
@@ -89,6 +92,15 @@
       <Project>{A96F3AFD-6AB4-4DF6-BF2B-D3D31D34F9C9}</Project>
     </ProjectReference>
   </ItemGroup>
+  <Target Name="LightD3D12CopyDirectXTK12Dll" AfterTargets="Build">
+    <PropertyGroup>
+      <LightD3D12DirectXTK12Dll Condition="'$(Configuration)'=='Debug'">$(LightD3D12DirectXTK12Root)debug\bin\DirectXTK12.dll</LightD3D12DirectXTK12Dll>
+      <LightD3D12DirectXTK12Dll Condition="'$(Configuration)'!='Debug'">$(LightD3D12DirectXTK12Root)bin\DirectXTK12.dll</LightD3D12DirectXTK12Dll>
+    </PropertyGroup>
+    <Error Text="DirectXTK12.dll was not found under $(VcpkgInstalledDir)." Condition="'$(LightD3D12DirectXTK12Root)'==''" />
+    <Error Text="DirectXTK12.dll was not found at $(LightD3D12DirectXTK12Dll)." Condition="!Exists('$(LightD3D12DirectXTK12Dll)')" />
+    <Copy SourceFiles="$(LightD3D12DirectXTK12Dll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

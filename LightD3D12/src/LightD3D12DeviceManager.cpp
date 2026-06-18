@@ -874,13 +874,13 @@ namespace lightd3d12
 
 	Swapchain* DeviceManager::Impl::GetSwapchain( SwapchainHandle swapchain ) noexcept
 	{
-		auto* resource = slotMapSwapchains_.Get( swapchain );
+		SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? resource->swapchain_.get() : nullptr;
 	}
 
 	const Swapchain* DeviceManager::Impl::GetSwapchain( SwapchainHandle swapchain ) const noexcept
 	{
-		const auto* resource = slotMapSwapchains_.Get( swapchain );
+		const SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? resource->swapchain_.get() : nullptr;
 	}
 

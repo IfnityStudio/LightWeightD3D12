@@ -64,6 +64,7 @@ namespace
 		RenderPipelineState planePipeline = {};
 		MeshGeometry plane = {};
 		TextureHandle texture = {};
+		SwapchainHandle swapchain = {};
 		std::string textureSource;
 		bool usingFallbackTexture = false;
 		uint32_t textureWidth = 0;
@@ -372,7 +373,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc );
+		app.swapchain = app.deviceManager->CreateSwapchain( swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
@@ -476,7 +478,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			commandBuffer.CmdPopDebugGroupLabel();
 			app.imguiRenderer->Render( commandBuffer );
 			commandBuffer.CmdEndRendering();
-			renderDevice->Submit( commandBuffer, currentTexture );
+			renderDevice->SubmitAndPresent( commandBuffer, app.swapchain );
+			
 		}
 
 		ctx.WaitIdle();

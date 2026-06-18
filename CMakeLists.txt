@@ -12,6 +12,30 @@ set(ourLightD3D12Root "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ourLibraryRoot "${ourLightD3D12Root}/LightD3D12")
 set(ourImguiRoot "${ourLightD3D12Root}/third_party/imgui")
 
+set(ourLocalVcpkgPrefix "")
+set(ourDirectXTK12ConfigDir "")
+if(EXISTS "${ourLightD3D12Root}/vcpkg_installed/x64-windows/share/directxtk12/directxtk12-config.cmake")
+    set(ourLocalVcpkgPrefix "${ourLightD3D12Root}/vcpkg_installed/x64-windows")
+    set(ourDirectXTK12ConfigDir "${ourLocalVcpkgPrefix}/share/directxtk12")
+elseif(EXISTS "${ourLightD3D12Root}/vcpkg_installed/x64-windows/x64-windows/share/directxtk12/directxtk12-config.cmake")
+    set(ourLocalVcpkgPrefix "${ourLightD3D12Root}/vcpkg_installed/x64-windows/x64-windows")
+    set(ourDirectXTK12ConfigDir "${ourLocalVcpkgPrefix}/share/directxtk12")
+elseif(EXISTS "${ourLightD3D12Root}/vcpkg_installed/x64-windows/share")
+    set(ourLocalVcpkgPrefix "${ourLightD3D12Root}/vcpkg_installed/x64-windows")
+elseif(EXISTS "${ourLightD3D12Root}/vcpkg_installed/x64-windows/x64-windows/share")
+    set(ourLocalVcpkgPrefix "${ourLightD3D12Root}/vcpkg_installed/x64-windows/x64-windows")
+endif()
+
+if(ourLocalVcpkgPrefix)
+    list(PREPEND CMAKE_PREFIX_PATH "${ourLocalVcpkgPrefix}")
+endif()
+
+if(ourDirectXTK12ConfigDir)
+    set(directxtk12_DIR "${ourDirectXTK12ConfigDir}")
+endif()
+
+find_package(directxtk12 CONFIG QUIET)
+
 set(ourPublicHeaders
     "${ourLibraryRoot}/include/LightD3D12/HandleSlotMap.hpp"
     "${ourLibraryRoot}/include/LightD3D12/LightD3D12.hpp"
@@ -190,6 +214,16 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/MultiWindow/main.cpp"
     )
 
+    if(TARGET Microsoft::DirectXTK12)
+        ourAddSample(
+            LightD3D12SdkMeshPowerplant
+            "${ourLightD3D12Root}/samples/SdkMeshPowerplant/main.cpp"
+        )
+        target_link_libraries(LightD3D12SdkMeshPowerplant PRIVATE Microsoft::DirectXTK12)
+    else()
+        message(STATUS "DirectXTK12 not found, skipping LightD3D12SdkMeshPowerplant.")
+    endif()
+
     target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12GlobeMap PRIVATE windowscodecs ole32)
     target_link_libraries(LightD3D12TexturePlane PRIVATE windowscodecs ole32)
@@ -228,5 +262,6 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuidePS.hlsl"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuideVS.hlsl"
         "${ourLightD3D12Root}/samples/MultiWindow/main.cpp"
+        "${ourLightD3D12Root}/samples/SdkMeshPowerplant/main.cpp"
     )
 endif()
