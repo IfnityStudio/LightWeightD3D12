@@ -44,7 +44,7 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState spritePipeline;
 		TextureHandle enemyTexture = {};
 		TextureHandle spriteLayerA = {};
@@ -414,7 +414,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = ourInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
 		app.spritePipeline = CreateSpritePipeline( ctx, contextDesc.swapchainFormat );
 
@@ -549,7 +549,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			}
 		}
 		app.spritePipeline = {};
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 
 		if( IsWindow( hwnd ) != FALSE )
 		{
@@ -565,6 +566,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& )
 	{
+		DeviceManager::ShutdownSingleton();
 		if( shouldUninitializeCom )
 		{
 			CoUninitialize();
@@ -573,3 +575,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		return 1;
 	}
 }
+
+
+
+

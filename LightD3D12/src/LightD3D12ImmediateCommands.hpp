@@ -35,6 +35,8 @@ namespace lightd3d12
 		void WaitAll();
 
 	private:
+		CommandListWrapper* FindOldestSubmittedBuffer() noexcept;
+		void WaitForFirstAvailable();
 		void Purge();
 
 	private:

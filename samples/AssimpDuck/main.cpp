@@ -66,7 +66,7 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		RenderPipelineState solidPipeline;
 		RenderPipelineState wireframePipeline;
@@ -417,7 +417,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
@@ -554,7 +554,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		DestroyModel( ctx, app.model );
 		DestroyDepthTarget( ctx, app.depthTarget );
 		app.imguiRenderer.reset();
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 
 		DestroyWindow( hwnd );
 		UnregisterClassW( windowClass.lpszClassName, instance );
@@ -562,7 +563,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& exception )
 	{
+		DeviceManager::ShutdownSingleton();
 		MessageBoxA( nullptr, exception.what(), "LightD3D12 Assimp Duck", MB_OK | MB_ICONERROR );
 		return 1;
 	}
 }
+
+
+
+

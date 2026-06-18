@@ -12,9 +12,9 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <ProjectGuid>{2319BA04-DD9B-45D6-A7E8-8C8183B58676}</ProjectGuid>
+    <ProjectGuid>{CDD58DA8-01EB-4F1A-9616-765F215E0369}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>LightD3D12VectorFields3D</RootNamespace>
+    <RootNamespace>LightD3D12MultiWindow</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -45,7 +45,7 @@
   <PropertyGroup>
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <TargetName>LightD3D12VectorFields3D</TargetName>
+    <TargetName>LightD3D12MultiWindow</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

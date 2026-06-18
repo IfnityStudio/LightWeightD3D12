@@ -21,7 +21,7 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		RenderPipelineState pipelineGeometry;
 		RenderPipelineState pipelineFinal;
@@ -322,7 +322,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = ourInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 		app.pipelineGeometry = CreateGeometryPipeline( *app.deviceManager->GetRenderDevice() );
 		app.pipelineFinal = CreateFinalPipeline( *app.deviceManager->GetRenderDevice(), contextDesc.swapchainFormat );
@@ -358,7 +358,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			geometryPass.color[ 0 ].loadOp = LoadOp::Clear;
 			geometryPass.color[ 0 ].clearColor = { 0.08f, 0.10f, 0.14f, 1.0f };
 			geometryPass.color[ 1 ].loadOp = LoadOp::Clear;
-			geometryPass.color[ 1 ].clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+			geometryPass.color[ 1 ].clearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
 
 			Framebuffer geometryFramebuffer{};
 			geometryFramebuffer.color[ 0 ].texture = app.deferredTargets.sceneColor;
@@ -450,7 +450,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		}
 		app.pipelineFinal = {};
 		app.pipelineGeometry = {};
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 
 		if( IsWindow( hwnd ) != FALSE )
 		{
@@ -462,6 +463,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& exception )
 	{
+		DeviceManager::ShutdownSingleton();
 		if( hwnd != nullptr && IsWindow( hwnd ) != FALSE )
 		{
 			SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
@@ -477,3 +479,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		return 1;
 	}
 }
+
+
+
+

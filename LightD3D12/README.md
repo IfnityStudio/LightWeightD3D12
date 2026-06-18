@@ -16,7 +16,7 @@ Design goals:
 The `samples/HelloTriangle` project demonstrates the intended command flow:
 
 ```cpp
-lightd3d12::DeviceManager deviceManager(contextDesc, swapchainDesc);
+lightd3d12::DeviceManager& deviceManager = lightd3d12::DeviceManager::Initialize(contextDesc, swapchainDesc);
 lightd3d12::RenderDevice* ctx = deviceManager.GetRenderDevice();
 
 auto& buffer = ctx->AcquireCommandBuffer();
@@ -30,6 +30,8 @@ buffer.CmdPopDebugGroupLabel();
 buffer.CmdEndRendering();
 
 ctx->Submit(buffer, currentTexture);
+
+lightd3d12::DeviceManager::ShutdownSingleton();
 ```
 
 ## GPU mip generation
@@ -60,6 +62,18 @@ When `countMipMap` is greater than `1` and initial texture data is provided, Lig
 This removes the previous CPU-side mip chain build, avoids temporary `std::vector<std::vector<uint8_t>>` allocations for texture data, and keeps the mip generation work close to the GPU where the texture will be consumed.
 
 The compute shader used by `BaseMips` lives in [src/shaders/LightD3D12BaseMipsCS.hlsl](./src/shaders/LightD3D12BaseMipsCS.hlsl), so the mip generation logic stays isolated from the C++ orchestration code.
+
+## Texture creation workflow
+
+`RenderDevice::CreateTexture(...)` is easier to follow if you read it as five stages:
+
+1. Validate the requested usage and dimension combination.
+2. Build a `TextureCreationPlan` that resolves mip count and whether the internal GPU mip path is needed.
+3. Prepare a `TextureResource` with resolved formats, resource flags, and the final `D3D12_RESOURCE_DESC`.
+4. Create the committed D3D12 resource and then create the requested views (`SRV`, internal mip `UAV`s, external `UAV`, `RTV`, `DSV`).
+5. Optionally upload the initial `Texture2D` data and generate the remaining mip chain on the GPU.
+
+That means the main function is orchestration only. The decisions about formats, flags, and restrictions live in small helpers, so the workflow stays readable when new texture cases are added.
 
 Current scope of the internal compute mip path:
 

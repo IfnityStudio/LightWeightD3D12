@@ -242,7 +242,7 @@ namespace lightd3d12
 
 		void CreateCommittedTextureResource( DeviceManager::Impl& impl, const TextureDesc& desc, TextureResource& resource )
 		{
-			const auto heapProps = CD3DX12_HEAP_PROPERTIES( D3D12_HEAP_TYPE_DEFAULT );
+			const CD3DX12_HEAP_PROPERTIES heapProps( D3D12_HEAP_TYPE_DEFAULT );
 			const D3D12_CLEAR_VALUE* clearValue = desc.useClearValue ? &desc.clearValue : nullptr;
 			C_RESULT(
 				impl.device_->CreateCommittedResource(
@@ -395,8 +395,8 @@ namespace lightd3d12
 
 	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
-		auto& impl = *manager_->impl_;
-		auto& graphicsQueue = impl.GetGraphicsQueueContext();
+		DeviceManager::Impl& impl = *manager_->impl_;
+		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
 		std::unique_ptr<CommandBufferImpl>* availableSlot = nullptr;
 		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
 		{
@@ -409,18 +409,20 @@ namespace lightd3d12
 
 		if( availableSlot == nullptr )
 		{
-			throw std::runtime_error( "A maximum of four active command buffers are allowed per render device." );
+			throw std::runtime_error(
+				"A maximum of " + std::to_string( DeviceManager::Impl::ourMaxActiveCommandBuffers ) +
+				" active command buffers are allowed per render device." );
 		}
 
 		impl.ProcessDeferredReleases();
-		auto& wrapper = graphicsQueue.immediateCommands_->Acquire();
+		ImmediateCommands::CommandListWrapper& wrapper = graphicsQueue.immediateCommands_->Acquire();
 		*availableSlot = std::make_unique<CommandBufferImpl>( impl, wrapper );
 		return **availableSlot;
 	}
 
 	TextureHandle RenderDevice::GetCurrentSwapchainTexture( SwapchainHandle swapchain ) const
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		if( !swapchain.Valid() )
 		{
 			swapchain = manager_->primarySwapchain_;
@@ -438,7 +440,7 @@ namespace lightd3d12
 	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer, TextureHandle presentTexture )
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
-		auto& graphicsQueue = impl.GetGraphicsQueueContext();
+		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
 		CommandBufferImpl* commandBuffer = dynamic_cast<CommandBufferImpl*>( &buffer );
 		if( commandBuffer == nullptr )
 		{
@@ -446,7 +448,7 @@ namespace lightd3d12
 		}
 
 		std::unique_ptr<CommandBufferImpl>* activeSlot = nullptr;
-		for( auto& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
+		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
 		{
 			if( activeCommandBuffer.get() == commandBuffer )
 			{
@@ -470,7 +472,7 @@ namespace lightd3d12
 			commandBuffer->CmdTransitionTexture( presentTexture, D3D12_RESOURCE_STATE_PRESENT );
 		}
 
-		auto submitFixup = commandBuffer->BuildSubmitFixup();
+		CommandBufferImpl::SubmitFixupResources submitFixup = commandBuffer->BuildSubmitFixup();
 		const SubmitHandle handle = graphicsQueue.immediateCommands_->Submit( commandBuffer->Wrapper(), submitFixup.commandList_.Get() );
 		commandBuffer->CommitSubmittedTextureStates();
 		if( submitFixup.Valid() )
@@ -502,7 +504,7 @@ namespace lightd3d12
 
 	RenderPipelineState RenderDevice::CreateRenderPipeline( const RenderPipelineDesc& desc )
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.vertexShader.source == nullptr || desc.fragmentShader.source == nullptr )
 		{
 			throw std::runtime_error( "RenderPipelineDesc requires valid vertex and fragment shader source." );
@@ -573,7 +575,7 @@ namespace lightd3d12
 
 	ComputePipelineState RenderDevice::CreateComputePipeline( const ComputePipelineDesc& desc )
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.computeShader.source == nullptr )
 		{
 			throw std::runtime_error( "ComputePipelineDesc requires a valid compute shader source." );
@@ -592,7 +594,7 @@ namespace lightd3d12
 
 	BufferHandle RenderDevice::CreateBuffer( const BufferDesc& desc )
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.size == 0 )
 		{
 			throw std::runtime_error( "BufferDesc.size must be greater than zero." );
@@ -607,7 +609,7 @@ namespace lightd3d12
 		resource.desc_ = BufferResource::BufferDesc( desc.size, desc.flags );
 		resource.currentState_ = desc.heapType == D3D12_HEAP_TYPE_UPLOAD ? D3D12_RESOURCE_STATE_GENERIC_READ : desc.initialState;
 
-		const auto heapProps = CD3DX12_HEAP_PROPERTIES( desc.heapType );
+		const CD3DX12_HEAP_PROPERTIES heapProps( desc.heapType );
 		C_RESULT(
 			impl.device_->CreateCommittedResource(
 				&heapProps,
@@ -659,7 +661,7 @@ namespace lightd3d12
 
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		ValidateTextureDesc( desc );
 		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
 		TextureResource resource = PrepareTextureResource( desc, creationPlan );
@@ -706,7 +708,7 @@ namespace lightd3d12
 
 	void RenderDevice::DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch )
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		TextureResource& textureResource = impl.GetTextureResource( texture );
 		impl.stagingDevice_->TextureData2D( textureResource, outData, rowPitch, slicePitch );
 	}
@@ -753,28 +755,53 @@ namespace lightd3d12
 
 	void RenderDevice::Destroy( BufferHandle buffer )
 	{
-		auto& impl = *manager_->impl_;
-		impl.WaitIdle();
-		auto* resource = impl.slotMapBuffers_.Get( buffer );
+		DeviceManager::Impl& impl = *manager_->impl_;
+		BufferResource* resource = impl.slotMapBuffers_.Get( buffer );
 		if( resource == nullptr )
 		{
 			return;
 		}
 
-		if( resource->mappedPtr_ != nullptr )
-		{
-			resource->resource_->Unmap( 0, nullptr );
-		}
-		impl.FreeBindlessDescriptor( resource->srvIndex_ );
-		resource->resource_.Reset();
+		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
+		const SubmitHandle releaseHandle = graphicsQueue.immediateCommands_ != nullptr
+			? graphicsQueue.immediateCommands_->GetLastSubmitHandle()
+			: SubmitHandle{};
+		ComPtr<ID3D12Resource> nativeResource = std::move( resource->resource_ );
+		const bool wasMapped = resource->mappedPtr_ != nullptr;
+		const uint32_t srvIndex = resource->srvIndex_;
+		resource->mappedPtr_ = nullptr;
+		resource->srvIndex_ = UINT32_MAX;
 		impl.slotMapBuffers_.Destroy( buffer );
+
+		std::function<void()> release =
+			[ &impl, nativeResource = std::move( nativeResource ), wasMapped, srvIndex ]() mutable
+			{
+				if( nativeResource != nullptr && wasMapped )
+				{
+					nativeResource->Unmap( 0, nullptr );
+				}
+
+				impl.FreeBindlessDescriptor( srvIndex );
+				nativeResource.Reset();
+			};
+
+		if( graphicsQueue.immediateCommands_ == nullptr ||
+			releaseHandle.Empty() ||
+			graphicsQueue.immediateCommands_->IsReady( releaseHandle ) )
+		{
+			release();
+		}
+		else
+		{
+			impl.AddDeferredRelease( releaseHandle, std::move( release ) );
+		}
 	}
 
 	void RenderDevice::Destroy( TextureHandle texture )
 	{
-		auto& impl = *manager_->impl_;
+		DeviceManager::Impl& impl = *manager_->impl_;
 		impl.WaitIdle();
-		auto* resource = impl.slotMapTextures_.Get( texture );
+		TextureResource* resource = impl.slotMapTextures_.Get( texture );
 		if( resource == nullptr )
 		{
 			return;

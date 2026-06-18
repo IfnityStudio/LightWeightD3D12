@@ -35,6 +35,8 @@ set(ourLibraryShaderFiles
     "${ourLibraryRoot}/src/shaders/LightD3D12BaseMipsCS.hlsl"
 )
 
+set_source_files_properties(${ourLibraryShaderFiles} PROPERTIES HEADER_FILE_ONLY TRUE)
+
 set(ourLibrarySources
     "${ourLibraryRoot}/src/LightD3D12Resources.cpp"
     "${ourLibraryRoot}/src/LightD3D12ImmediateCommands.cpp"
@@ -184,9 +186,8 @@ if(LIGHTD3D12_BUILD_SAMPLES)
     )
 
     ourAddSample(
-        LightD3D12VectorFields3D
-        "${ourLightD3D12Root}/samples/VectorFields3D/main.cpp"
-        "${ourLightD3D12Root}/samples/VectorFields3D/CMakeLists.txt"
+        LightD3D12MultiWindow
+        "${ourLightD3D12Root}/samples/MultiWindow/main.cpp"
     )
 
     target_link_libraries(LightD3D12Sprites PRIVATE windowscodecs ole32)
@@ -226,7 +227,6 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/RayMarchingGuide/README.md"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuidePS.hlsl"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuideVS.hlsl"
-        "${ourLightD3D12Root}/samples/VectorFields3D/main.cpp"
-        "${ourLightD3D12Root}/samples/VectorFields3D/CMakeLists.txt"
+        "${ourLightD3D12Root}/samples/MultiWindow/main.cpp"
     )
 endif()

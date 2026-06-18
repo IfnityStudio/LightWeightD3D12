@@ -94,5 +94,6 @@ namespace lightd3d12
 		bool isDepthFormat_ = false;
 		bool isStencilFormat_ = false;
 		bool isSwapchainImage_ = false;
+		SwapchainHandle swapchain_ = {};
 	};
 }
