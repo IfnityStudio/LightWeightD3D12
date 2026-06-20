@@ -3,6 +3,7 @@
   "name": "lightweightd3d12",
   "version-string": "0.1.0",
   "dependencies": [
+    "directxtk12",
     "usd",
     "winpixevent"
   ]

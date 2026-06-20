@@ -17,7 +17,7 @@ namespace lightd3d12
 
 		for( uint32_t i = 0; i < buffers_.size(); ++i )
 		{
-			auto& buffer = buffers_[ i ];
+			CommandListWrapper& buffer = buffers_[ i ];
 
 			C_RESULT(
 				device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( buffer.allocator_.GetAddressOf() ) ),
@@ -50,7 +50,7 @@ namespace lightd3d12
 
 	ImmediateCommands::~ImmediateCommands()
 	{
-		for( auto& buffer : buffers_ )
+		for( CommandListWrapper& buffer : buffers_ )
 		{
 			if( buffer.fence_ && buffer.fence_->GetCompletedValue() < buffer.fenceValue_ )
 			{
@@ -90,11 +90,11 @@ namespace lightd3d12
 
 		while( numAvailableCommandBuffers_ == 0 )
 		{
-			WaitAll();
+			WaitForFirstAvailable();
 		}
 
 		CommandListWrapper* current = nullptr;
-		for( auto& buffer : buffers_ )
+		for( CommandListWrapper& buffer : buffers_ )
 		{
 			if( !buffer.isEncoding_ && buffer.fenceValue_ == 0 )
 			{
@@ -170,7 +170,7 @@ namespace lightd3d12
 		}
 
 		assert( handle.bufferIndex_ < buffers_.size() );
-		const auto& buffer = buffers_[ handle.bufferIndex_ ];
+		const CommandListWrapper& buffer = buffers_[ handle.bufferIndex_ ];
 
 		if( buffer.handle_.submitId_ != handle.submitId_ )
 		{
@@ -198,7 +198,7 @@ namespace lightd3d12
 		}
 
 		assert( handle.bufferIndex_ < buffers_.size() );
-		auto& buffer = buffers_[ handle.bufferIndex_ ];
+		CommandListWrapper& buffer = buffers_[ handle.bufferIndex_ ];
 		if( buffer.isEncoding_ )
 		{
 			throw std::runtime_error( "Waiting on an immediate command buffer that has not been submitted." );
@@ -213,7 +213,7 @@ namespace lightd3d12
 
 	void ImmediateCommands::WaitAll()
 	{
-		for( auto& buffer : buffers_ )
+		for( CommandListWrapper& buffer : buffers_ )
 		{
 			if( buffer.fenceValue_ == 0 || buffer.isEncoding_ )
 			{
@@ -230,6 +230,48 @@ namespace lightd3d12
 		Purge();
 	}
 
+	ImmediateCommands::CommandListWrapper* ImmediateCommands::FindOldestSubmittedBuffer() noexcept
+	{
+		if( buffers_.empty() )
+		{
+			return nullptr;
+		}
+
+		for( uint32_t i = 0; i < buffers_.size(); ++i )
+		{
+			CommandListWrapper& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % buffers_.size() ];
+			if( buffer.fenceValue_ != 0 && !buffer.isEncoding_ )
+			{
+				return &buffer;
+			}
+		}
+
+		return nullptr;
+	}
+
+	void ImmediateCommands::WaitForFirstAvailable()
+	{
+        Purge();
+		if( numAvailableCommandBuffers_ > 0 )
+		{
+			return;
+		}
+
+		CommandListWrapper* oldestSubmittedBuffer = FindOldestSubmittedBuffer();
+		if( oldestSubmittedBuffer == nullptr )
+		{
+			throw std::runtime_error( "No immediate command buffer is available to wait for." );
+		}
+
+		if( oldestSubmittedBuffer->fence_->GetCompletedValue() < oldestSubmittedBuffer->fenceValue_ )
+		{
+			oldestSubmittedBuffer->fence_->SetEventOnCompletion( oldestSubmittedBuffer->fenceValue_, oldestSubmittedBuffer->fenceEvent_ );
+			WaitForSingleObject( oldestSubmittedBuffer->fenceEvent_, INFINITE );
+		}
+
+		Purge();
+	}
+
 	void ImmediateCommands::Purge()
 	{
 		if( buffers_.empty() )
@@ -239,7 +281,7 @@ namespace lightd3d12
 
 		for( uint32_t i = 0; i < buffers_.size(); ++i )
 		{
-			auto& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % buffers_.size() ];
+			CommandListWrapper& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % buffers_.size() ];
 			if( buffer.fenceValue_ == 0 )
 			{
 				continue;

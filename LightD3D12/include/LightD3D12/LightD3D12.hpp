@@ -423,6 +423,9 @@ namespace lightd3d12
 		ICommandBuffer& AcquireCommandBuffer();
 		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
 		SubmitHandle Submit( ICommandBuffer& buffer, TextureHandle presentTexture );
+		SubmitHandle Submit( ICommandBuffer& buffer ) const;
+		SubmitHandle SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain );
+		void Present( SwapchainHandle swapchain ) const;
 
 		RenderPipelineState CreateRenderPipeline( const RenderPipelineDesc& desc );
 		ComputePipelineState CreateComputePipeline( const ComputePipelineDesc& desc );

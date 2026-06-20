@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{A4890C87-880F-42C6-AF6B-2EC412124CEC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="enkiTS">
+      <UniqueIdentifier>{76F6C4D5-6140-41D4-8BC7-0D9BAA6B673D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\enkiTS\src\TaskScheduler.cpp">
+      <Filter>enkiTS</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\third_party\enkiTS\src\Atomics.h">
+      <Filter>enkiTS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\enkiTS\src\LockLessMultiReadPipe.h">
+      <Filter>enkiTS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\enkiTS\src\TaskScheduler.h">
+      <Filter>enkiTS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\enkiTS\src\Threads.h">
+      <Filter>enkiTS</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

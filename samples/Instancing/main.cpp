@@ -47,7 +47,7 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		RenderPipelineState solidPipeline;
 		RenderPipelineState wireframePipeline;
@@ -438,7 +438,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 		app.solidPipeline = CreateInstancingPipeline( *app.deviceManager->GetRenderDevice(), contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT, false );
 		app.wireframePipeline = CreateInstancingPipeline( *app.deviceManager->GetRenderDevice(), contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT, true );
@@ -607,7 +607,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		app.solidPipeline = {};
 		app.wireframePipeline = {};
 		app.imguiRenderer.reset();
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 		if( IsWindow( hwnd ) != FALSE )
 		{
 			DestroyWindow( hwnd );
@@ -617,7 +618,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& )
 	{
+		DeviceManager::ShutdownSingleton();
 		MessageBoxA( nullptr, "LightD3D12 Instancing failed.", "LightD3D12", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }
+
+
+
+

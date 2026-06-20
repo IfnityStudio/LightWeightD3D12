@@ -1,0 +1,12 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=url
+command=C:/Program Files/CMake/bin/cmake.exe;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;C:/LightWeightD3D12/samples/EnkiSample/external/enkits-subbuild/enkits-populate-prefix/src/enkits-populate-stamp/download-enkits-populate.cmake;COMMAND;C:/Program Files/CMake/bin/cmake.exe;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;C:/LightWeightD3D12/samples/EnkiSample/external/enkits-subbuild/enkits-populate-prefix/src/enkits-populate-stamp/verify-enkits-populate.cmake;COMMAND;C:/Program Files/CMake/bin/cmake.exe;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;C:/LightWeightD3D12/samples/EnkiSample/external/enkits-subbuild/enkits-populate-prefix/src/enkits-populate-stamp/extract-enkits-populate.cmake
+source_dir=C:/LightWeightD3D12/samples/EnkiSample/external/enkits-src
+work_dir=C:/LightWeightD3D12/samples/EnkiSample/external
+url(s)=https://github.com/dougbinks/enkiTS/archive/03e6a2c0c97208ade44478d617d2002b0f95faf4.zip
+hash=
+      no_extract=
+

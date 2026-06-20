@@ -59,7 +59,7 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		std::array<ComputePipelineState, ourGroupPresets.size()> computePipelines;
 		TextureHandle outputTexture = {};
@@ -455,7 +455,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
@@ -604,7 +604,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			pipeline = {};
 		}
 		app.imguiRenderer.reset();
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 		if( IsWindow( hwnd ) != FALSE )
 		{
 			DestroyWindow( hwnd );
@@ -614,7 +615,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& )
 	{
+		DeviceManager::ShutdownSingleton();
 		MessageBoxA( nullptr, "LightD3D12 Compute failed.", "LightD3D12", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }
+
+
+

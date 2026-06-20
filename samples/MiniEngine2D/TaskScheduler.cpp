@@ -1,21 +1,15 @@
 #include "TaskScheduler.hpp"
 
-#include "Profiler.hpp"
-
-#include <string>
-#include <stdexcept>
-
 namespace mini2d
 {
 	TaskScheduler::TaskScheduler( size_t workerCount )
 	{
-		workers_.reserve( workerCount );
-		for( size_t index = 0; index < workerCount; ++index )
+		const size_t resolvedWorkerCount = std::max<size_t>( 1, workerCount );
+		workers_.reserve( resolvedWorkerCount );
+		for( size_t index = 0; index < resolvedWorkerCount; ++index )
 		{
-			workers_.emplace_back( [this, index]()
+			workers_.emplace_back( [this]()
 				{
-					const std::string threadName = "TaskWorker " + std::to_string( index );
-					SetProfilerThreadName( threadName.c_str() );
 					WorkerLoop();
 				} );
 		}
@@ -30,6 +24,11 @@ namespace mini2d
 	{
 		{
 			std::lock_guard<std::mutex> lock( mutex_ );
+			if( stopping_ )
+			{
+				return;
+			}
+
 			stopping_ = true;
 		}
 
@@ -72,7 +71,6 @@ namespace mini2d
 				jobs_.pop();
 			}
 
-			MINI_PROFILE_SCOPE( "TaskScheduler::ExecuteJob" );
 			job();
 		}
 	}

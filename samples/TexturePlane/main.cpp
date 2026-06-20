@@ -59,11 +59,12 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		RenderPipelineState planePipeline = {};
 		MeshGeometry plane = {};
 		TextureHandle texture = {};
+		SwapchainHandle swapchain = {};
 		std::string textureSource;
 		bool usingFallbackTexture = false;
 		uint32_t textureWidth = 0;
@@ -372,7 +373,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc );
+		app.swapchain = app.deviceManager->CreateSwapchain( swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 
 		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
@@ -476,7 +478,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			commandBuffer.CmdPopDebugGroupLabel();
 			app.imguiRenderer->Render( commandBuffer );
 			commandBuffer.CmdEndRendering();
-			renderDevice->Submit( commandBuffer, currentTexture );
+			renderDevice->SubmitAndPresent( commandBuffer, app.swapchain );
+			
 		}
 
 		ctx.WaitIdle();
@@ -493,7 +496,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ctx.Destroy( app.plane.indexBuffer );
 		}
 		app.imguiRenderer.reset();
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
 		DestroyWindow( hwnd );
@@ -502,7 +506,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& exception )
 	{
+		DeviceManager::ShutdownSingleton();
 		MessageBoxA( nullptr, exception.what(), "LightD3D12 TexturePlane Error", MB_ICONERROR | MB_OK );
 		return -1;
 	}
 }
+
+
+
+

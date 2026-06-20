@@ -33,7 +33,7 @@ sequenceDiagram
     RT->>RQ: Reset()
     RT->>RT: Spawn render thread
 
-    RT->>RD: Create DeviceManager(contextDesc, swapchainDesc)
+    RT->>RD: Initialize DeviceManager singleton(contextDesc, swapchainDesc)
     RT->>SR: Initialize(renderDevice, swapchainFormat, enemy.png)
     RT->>IG: Construct ImguiRenderer(deviceManager, window)
     RT-->>GE: initialization complete
@@ -60,7 +60,7 @@ flowchart TD
     D --> H["GameEngine::GetRender().Start(config)"]
     H --> I["RenderThread"]
     I --> J["RenderQueue.Reset()"]
-    I --> K["Create DeviceManager"]
+    I --> K["Initialize DeviceManager singleton"]
     I --> L["SpriteRenderer2D.Initialize(enemy.png)"]
     I --> M["ImguiRenderer.Initialize()"]
 

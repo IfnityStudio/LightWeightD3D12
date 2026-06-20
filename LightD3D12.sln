@@ -40,6 +40,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GlobeMap", "samples\GlobeMa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TexturePlane", "samples\TexturePlane\TexturePlane.vcxproj", "{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnkiSample", "samples\EnkiSample\EnkiSample.vcxproj", "{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RayMarchingGuide", "samples\RayMarchingGuide\RayMarchingGuide.vcxproj", "{36CAB969-E220-42B5-8039-5D7FF289438B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UsdStaticScene", "samples\UsdStaticScene\UsdStaticScene.vcxproj", "{D4E4F09A-C83F-451F-A28E-07B56872D7AA}"
@@ -47,6 +49,12 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightmapBakedCube", "samples\LightmapBakedCube\LightmapBakedCube.vcxproj", "{72BD0940-6AB3-4B1C-A272-4F0CB42318D2}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnvironmentImgui", "samples\EnvironmentImgui\EnvironmentImgui.vcxproj", "{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SphericalHarmonicsSimple", "samples\SphericalHarmonicsSimple\SphericalHarmonicsSimple.vcxproj", "{C1291AEC-F83B-40DD-859D-F7E37DB45820}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MultiWindow", "samples\MultiWindow\MultiWindow.vcxproj", "{CDD58DA8-01EB-4F1A-9616-765F215E0369}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SdkMeshPowerplant", "samples\SdkMeshPowerplant\SdkMeshPowerplant.vcxproj", "{5772D606-07E5-4498-9A4E-8DD04565B637}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LightD3D12WpfNative", "bindings\LightD3D12WpfNative\LightD3D12WpfNative.vcxproj", "{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}"
 EndProject
@@ -60,6 +68,18 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FSR Integration", "FSR Inte
 		LightD3D12.FSR.props = LightD3D12.FSR.props
 		third_party\amd_fsr_sdk\README.md = third_party\amd_fsr_sdk\README.md
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "EnkiStaticOnly", "EnkiStaticOnly", "{7A3D7B6A-21F9-4DA3-8DB0-2E7B0C8E26E4}"
+	ProjectSection(SolutionItems) = preProject
+		CMakePresets.json = CMakePresets.json
+		examples\EnkiStaticOnly\CMakeLists.txt = examples\EnkiStaticOnly\CMakeLists.txt
+		examples\EnkiStaticOnly\main.cpp = examples\EnkiStaticOnly\main.cpp
+		examples\EnkiStaticOnly\README.md = examples\EnkiStaticOnly\README.md
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_libraries", "samples\test_libraries\test_libraries.vcxproj", "{BD251A9C-53B3-400B-BDBB-E9E307D150A2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ejemplo2", "samples\ejemplo2\ejemplo2.vcxproj", "{83801E5E-D784-4211-8833-3A902BE379D9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -143,6 +163,10 @@ Global
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Debug|x64.Build.0 = Debug|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.ActiveCfg = Release|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.Build.0 = Release|x64
+		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Debug|x64.ActiveCfg = Debug|x64
+		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Debug|x64.Build.0 = Debug|x64
+		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Release|x64.ActiveCfg = Release|x64
+		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Release|x64.Build.0 = Release|x64
 		{36CAB969-E220-42B5-8039-5D7FF289438B}.Debug|x64.ActiveCfg = Debug|x64
 		{36CAB969-E220-42B5-8039-5D7FF289438B}.Debug|x64.Build.0 = Debug|x64
 		{36CAB969-E220-42B5-8039-5D7FF289438B}.Release|x64.ActiveCfg = Release|x64
@@ -159,6 +183,18 @@ Global
 		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Debug|x64.Build.0 = Debug|x64
 		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Release|x64.ActiveCfg = Release|x64
 		{B2DA53EB-07CB-4EE8-890A-8B48ED428D47}.Release|x64.Build.0 = Release|x64
+		{C1291AEC-F83B-40DD-859D-F7E37DB45820}.Debug|x64.ActiveCfg = Debug|x64
+		{C1291AEC-F83B-40DD-859D-F7E37DB45820}.Debug|x64.Build.0 = Debug|x64
+		{C1291AEC-F83B-40DD-859D-F7E37DB45820}.Release|x64.ActiveCfg = Release|x64
+		{C1291AEC-F83B-40DD-859D-F7E37DB45820}.Release|x64.Build.0 = Release|x64
+		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Debug|x64.ActiveCfg = Debug|x64
+		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Debug|x64.Build.0 = Debug|x64
+		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Release|x64.ActiveCfg = Release|x64
+		{CDD58DA8-01EB-4F1A-9616-765F215E0369}.Release|x64.Build.0 = Release|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Debug|x64.ActiveCfg = Debug|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Debug|x64.Build.0 = Debug|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Release|x64.ActiveCfg = Release|x64
+		{5772D606-07E5-4498-9A4E-8DD04565B637}.Release|x64.Build.0 = Release|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.ActiveCfg = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Debug|x64.Build.0 = Debug|x64
 		{0A7278F8-D4CC-4E17-A25D-A97D94FA104B}.Release|x64.ActiveCfg = Release|x64
@@ -167,6 +203,14 @@ Global
 		{58BA7B56-4211-4C1E-A01F-00501854660B}.Debug|x64.Build.0 = Debug|x64
 		{58BA7B56-4211-4C1E-A01F-00501854660B}.Release|x64.ActiveCfg = Release|x64
 		{58BA7B56-4211-4C1E-A01F-00501854660B}.Release|x64.Build.0 = Release|x64
+		{BD251A9C-53B3-400B-BDBB-E9E307D150A2}.Debug|x64.ActiveCfg = Debug|x64
+		{BD251A9C-53B3-400B-BDBB-E9E307D150A2}.Debug|x64.Build.0 = Debug|x64
+		{BD251A9C-53B3-400B-BDBB-E9E307D150A2}.Release|x64.ActiveCfg = Release|x64
+		{BD251A9C-53B3-400B-BDBB-E9E307D150A2}.Release|x64.Build.0 = Release|x64
+		{83801E5E-D784-4211-8833-3A902BE379D9}.Debug|x64.ActiveCfg = Debug|x64
+		{83801E5E-D784-4211-8833-3A902BE379D9}.Debug|x64.Build.0 = Debug|x64
+		{83801E5E-D784-4211-8833-3A902BE379D9}.Release|x64.ActiveCfg = Release|x64
+		{83801E5E-D784-4211-8833-3A902BE379D9}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

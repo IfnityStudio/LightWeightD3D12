@@ -14,7 +14,16 @@ namespace lightd3d12
 	class Swapchain final
 	{
 	public:
-		Swapchain( DeviceManager::Impl& ctx, HWND hwnd, uint32_t width, uint32_t height );
+		struct Properties final
+		{
+			uint32_t width_ = 0;
+			uint32_t height_ = 0;
+			uint32_t numSwapchainImages_ = 0;
+			uint32_t currentBackBufferIndex_ = 0;
+			DXGI_FORMAT surfaceFormat_ = DXGI_FORMAT_R8G8B8A8_UNORM;
+		};
+
+		Swapchain( DeviceManager::Impl& ctx, SwapchainHandle swapchainHandle, HWND hwnd, uint32_t width, uint32_t height );
 		~Swapchain();
 		Swapchain( const Swapchain& ) = delete;
 		Swapchain& operator=( const Swapchain& ) = delete;
@@ -32,14 +41,11 @@ namespace lightd3d12
 		bool CheckVSyncEnabled() const noexcept;
 
 		DeviceManager::Impl& ctx_;
+		SwapchainHandle swapchainHandle_ = {};
 		ComPtr<IDXGISwapChain4> swapchain_;
 		std::array<ComPtr<ID3D12Resource>, ourMaxSwapchainBuffers> backBuffers_;
 		std::array<TextureHandle, ourMaxSwapchainBuffers> backBufferHandles_;
 		std::array<D3D12_CPU_DESCRIPTOR_HANDLE, ourMaxSwapchainBuffers> rtvHandles_;
-		uint32_t width_ = 0;
-		uint32_t height_ = 0;
-		uint32_t numSwapchainImages_ = 0;
-		uint32_t currentBackBufferIndex_ = 0;
-		DXGI_FORMAT surfaceFormat_ = DXGI_FORMAT_R8G8B8A8_UNORM;
+		Properties properties_;
 	};
 }

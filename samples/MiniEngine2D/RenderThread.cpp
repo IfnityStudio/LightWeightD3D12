@@ -157,7 +157,7 @@ namespace mini2d
 			swapchainDesc.height = config.height;
 			swapchainDesc.vsync = config.vsync;
 
-			auto deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+			DeviceManager* deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 			SpriteRenderer2D spriteRenderer;
 			spriteRenderer.Initialize( *deviceManager->GetRenderDevice(), contextDesc.swapchainFormat, config.assetRoot / "enemy.png" );
 
@@ -268,10 +268,11 @@ namespace mini2d
 			spriteRenderer.Shutdown( *deviceManager->GetRenderDevice() );
 			imguiReady_.store( false, std::memory_order_release );
 			imguiRenderer_.reset();
-			deviceManager.reset();
+			DeviceManager::ShutdownSingleton();
 		}
 		catch( const std::exception& exception )
 		{
+			DeviceManager::ShutdownSingleton();
 			std::lock_guard<std::mutex> lock( initMutex_ );
 			if( !initialized_ )
 			{

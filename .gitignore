@@ -80,3 +80,4 @@ build.ninja
 *.swo
 *~
 imgui.ini
+/.codex_ref

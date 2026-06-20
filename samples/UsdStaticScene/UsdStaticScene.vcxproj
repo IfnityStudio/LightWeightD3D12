@@ -47,6 +47,7 @@
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <TargetName>LightD3D12UsdStaticScene</TargetName>
+    <LightD3D12OpenUsdRoot Condition="'$(LightD3D12OpenUsdRoot)'=='' and Exists('$(VcpkgInstalledDir)$(VcpkgTriplet)\include\pxr\usd\usd\stage.h')">$(VcpkgInstalledDir)$(VcpkgTriplet)\</LightD3D12OpenUsdRoot>
     <LightD3D12OpenUsdRoot Condition="'$(LightD3D12OpenUsdRoot)'==''">$(VcpkgInstalledDir)</LightD3D12OpenUsdRoot>
     <LightD3D12OpenUsdBinDir Condition="'$(Configuration)'=='Debug'">$(LightD3D12OpenUsdRoot)debug\bin</LightD3D12OpenUsdBinDir>
     <LightD3D12OpenUsdBinDir Condition="'$(Configuration)'!='Debug'">$(LightD3D12OpenUsdRoot)bin</LightD3D12OpenUsdBinDir>

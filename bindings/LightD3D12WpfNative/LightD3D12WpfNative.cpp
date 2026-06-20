@@ -12,7 +12,7 @@
 
 using namespace lightd3d12;
 
-namespace
+namespace wpfa
 {
 	constexpr wchar_t kRenderWindowClassName[] = L"LightD3D12WpfNativeRenderWindow";
 
@@ -31,7 +31,8 @@ namespace
 		HWND renderHwnd = nullptr;
 		uint32_t width = 1;
 		uint32_t height = 1;
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
+		SwapchainHandle swapchain = {};
 		RenderPipelineState trianglePipeline;
 		std::array<float, 4> clearColor = { 0.04f, 0.06f, 0.09f, 1.0f };
 		float animationSpeed = 1.0f;
@@ -166,6 +167,8 @@ extern "C"
 {
 	__declspec( dllexport ) void* LightWpf_Create( HWND parentHwnd, uint32_t width, uint32_t height )
 	{
+		using namespace wpfa;
+		std::unique_ptr<NativeContext> context;
 		try
 		{
 			gLastError.clear();
@@ -176,7 +179,7 @@ extern "C"
 
 			RegisterRenderWindowClass();
 
-			auto context = std::make_unique<NativeContext>();
+			context = std::make_unique<NativeContext>();
 			context->parentHwnd = parentHwnd;
 			context->width = std::max( width, 1u );
 			context->height = std::max( height, 1u );
@@ -214,7 +217,8 @@ extern "C"
 			swapchainDesc.height = context->height;
 			swapchainDesc.vsync = true;
 
-			context->deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+			context->deviceManager = &DeviceManager::Initialize( contextDesc );
+			context->swapchain = context->deviceManager->CreateSwapchain( swapchainDesc );
 			context->trianglePipeline = CreateTrianglePipeline( *context->deviceManager->GetRenderDevice(), contextDesc.swapchainFormat );
 			context->lastFrameTime = std::chrono::steady_clock::now();
 
@@ -222,6 +226,25 @@ extern "C"
 		}
 		catch( const std::exception& exception )
 		{
+			if( context )
+			{
+				if( context->deviceManager != nullptr && context->swapchain.Valid() )
+				{
+					context->deviceManager->DestroySwapchain( context->swapchain );
+					context->swapchain = {};
+				}
+				if( context->deviceManager != nullptr )
+				{
+					DeviceManager::ShutdownSingleton();
+					context->deviceManager = nullptr;
+				}
+				if( context->renderHwnd != nullptr && IsWindow( context->renderHwnd ) != FALSE )
+				{
+					DestroyWindow( context->renderHwnd );
+					context->renderHwnd = nullptr;
+				}
+			}
+
 			SetLastErrorMessage( exception );
 			return nullptr;
 		}
@@ -229,6 +252,7 @@ extern "C"
 
 	__declspec( dllexport ) void LightWpf_Destroy( void* nativeContext )
 	{
+		using namespace wpfa;
 		try
 		{
 			gLastError.clear();
@@ -238,13 +262,19 @@ extern "C"
 				return;
 			}
 
-			if( context->deviceManager )
+			if( context->deviceManager != nullptr )
 			{
 				context->deviceManager->WaitIdle();
+				if( context->swapchain.Valid() )
+				{
+					context->deviceManager->DestroySwapchain( context->swapchain );
+					context->swapchain = {};
+				}
+				DeviceManager::ShutdownSingleton();
+				context->deviceManager = nullptr;
 			}
 
 			context->trianglePipeline = {};
-			context->deviceManager.reset();
 
 			if( context->renderHwnd != nullptr )
 			{
@@ -260,17 +290,18 @@ extern "C"
 
 	__declspec( dllexport ) HWND LightWpf_GetChildWindow( void* nativeContext )
 	{
-		const NativeContext* context = AsContext( nativeContext );
+		const wpfa::NativeContext* context = wpfa::AsContext( nativeContext );
 		return context != nullptr ? context->renderHwnd : nullptr;
 	}
 
 	__declspec( dllexport ) int LightWpf_Resize( void* nativeContext, uint32_t width, uint32_t height )
 	{
+		using namespace wpfa;
 		try
 		{
 			gLastError.clear();
 			NativeContext* context = AsContext( nativeContext );
-			if( context == nullptr || context->deviceManager == nullptr )
+			if( context == nullptr || context->deviceManager == nullptr || !context->swapchain.Valid() )
 			{
 				throw std::runtime_error( "LightWpf_Resize was called with an invalid context." );
 			}
@@ -285,7 +316,7 @@ extern "C"
 				static_cast<int>( context->width ),
 				static_cast<int>( context->height ),
 				SWP_NOZORDER | SWP_NOACTIVATE );
-			context->deviceManager->Resize( context->width, context->height );
+			context->deviceManager->Resize( context->swapchain, context->width, context->height );
 			return 1;
 		}
 		catch( const std::exception& exception )
@@ -297,11 +328,12 @@ extern "C"
 
 	__declspec( dllexport ) int LightWpf_Render( void* nativeContext )
 	{
+		using namespace wpfa;
 		try
 		{
 			gLastError.clear();
 			NativeContext* context = AsContext( nativeContext );
-			if( context == nullptr || context->deviceManager == nullptr )
+			if( context == nullptr || context->deviceManager == nullptr || !context->swapchain.Valid() )
 			{
 				throw std::runtime_error( "LightWpf_Render was called with an invalid context." );
 			}
@@ -314,7 +346,7 @@ extern "C"
 
 			RenderDevice& ctx = *context->deviceManager->GetRenderDevice();
 			ICommandBuffer& commandBuffer = ctx.AcquireCommandBuffer();
-			const TextureHandle currentTexture = ctx.GetCurrentSwapchainTexture();
+			const TextureHandle currentTexture = ctx.GetCurrentSwapchainTexture( context->swapchain );
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
@@ -345,6 +377,7 @@ extern "C"
 
 	__declspec( dllexport ) void LightWpf_SetClearColor( void* nativeContext, float red, float green, float blue )
 	{
+		using namespace wpfa; 
 		NativeContext* context = AsContext( nativeContext );
 		if( context == nullptr )
 		{
@@ -361,6 +394,7 @@ extern "C"
 
 	__declspec( dllexport ) void LightWpf_SetAnimationSpeed( void* nativeContext, float speed )
 	{
+		using namespace wpfa; 
 		NativeContext* context = AsContext( nativeContext );
 		if( context == nullptr )
 		{
@@ -372,6 +406,7 @@ extern "C"
 
 	__declspec( dllexport ) int LightWpf_GetLastError( char* buffer, int capacity )
 	{
+		using namespace wpfa;
 		if( buffer == nullptr || capacity <= 0 )
 		{
 			return static_cast<int>( gLastError.size() );

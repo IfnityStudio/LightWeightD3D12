@@ -72,7 +72,7 @@ namespace
 
 	struct AppState
 	{
-		std::unique_ptr<DeviceManager> deviceManager;
+		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<ImguiRenderer> imguiRenderer;
 		RenderPipelineState sceneDepthPipeline;
 		RenderPipelineState sceneReadOnlyDepthPipeline;
@@ -892,7 +892,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = std::make_unique<DeviceManager>( contextDesc, swapchainDesc );
+		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.imguiRenderer = std::make_unique<ImguiRenderer>( *app.deviceManager, swapchainDesc.window );
 		ResetCameraForMode( app );
 
@@ -1200,7 +1200,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		app.sceneNoDepthPipeline = {};
 		app.sceneReadOnlyDepthPipeline = {};
 		app.sceneDepthPipeline = {};
-		app.deviceManager.reset();
+		DeviceManager::ShutdownSingleton();
+		app.deviceManager = nullptr;
 
 		if( IsWindow( hwnd ) != FALSE )
 		{
@@ -1211,6 +1212,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	}
 	catch( const std::exception& exception )
 	{
+		DeviceManager::ShutdownSingleton();
 		if( hwnd != nullptr && IsWindow( hwnd ) != FALSE )
 		{
 			SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
@@ -1226,3 +1228,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		return 1;
 	}
 }
+
+
+
+
