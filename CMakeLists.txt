@@ -7,6 +7,7 @@ if(NOT WIN32)
 endif()
 
 option(LIGHTD3D12_BUILD_SAMPLES "Build LightD3D12 sample applications." ON)
+option(LIGHTD3D12_BUILD_ENKI_STATIC_ONLY_EXAMPLE "Build the standalone enkiTS static example." OFF)
 
 set(ourLightD3D12Root "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ourLibraryRoot "${ourLightD3D12Root}/LightD3D12")
@@ -160,6 +161,10 @@ function(ourAddSample targetName sourceFile)
 endfunction()
 
 ourSetOutputDirectories(LightD3D12)
+
+if(LIGHTD3D12_BUILD_ENKI_STATIC_ONLY_EXAMPLE)
+    add_subdirectory("${ourLightD3D12Root}/examples/EnkiStaticOnly")
+endif()
 
 if(LIGHTD3D12_BUILD_SAMPLES)
     ourAddSample(

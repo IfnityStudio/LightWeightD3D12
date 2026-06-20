@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}</ProjectGuid>
+    <Keyword>MakeFileProj</Keyword>
+    <RootNamespace>EnkiSample</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(MSBuildProjectDirectory)\build-vs\$(Configuration)\</OutDir>
+    <IntDir>$(MSBuildProjectDirectory)\build-vs\obj\$(Configuration)\</IntDir>
+    <TargetName>EnkiSample</TargetName>
+    <NMakeIncludeSearchPath>$(MSBuildProjectDirectory);$(MSBuildProjectDirectory)\external\enkits-src\src</NMakeIncludeSearchPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <NMakeBuildCommandLine>cmake -S "$(MSBuildProjectDirectory)" -B "$(MSBuildProjectDirectory)\build-vs" -G "Visual Studio 17 2022" -A x64 &amp;&amp; cmake --build "$(MSBuildProjectDirectory)\build-vs" --config Debug</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>cmake -S "$(MSBuildProjectDirectory)" -B "$(MSBuildProjectDirectory)\build-vs" -G "Visual Studio 17 2022" -A x64 &amp;&amp; cmake --build "$(MSBuildProjectDirectory)\build-vs" --config Debug --clean-first</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>if exist "$(MSBuildProjectDirectory)\build-vs\CMakeCache.txt" cmake --build "$(MSBuildProjectDirectory)\build-vs" --config Debug --target clean</NMakeCleanCommandLine>
+    <NMakeOutput>$(MSBuildProjectDirectory)\build-vs\Debug\EnkiSample.exe</NMakeOutput>
+    <LocalDebuggerCommand>$(MSBuildProjectDirectory)\build-vs\Debug\EnkiSample.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>$(MSBuildProjectDirectory)\build-vs\Debug</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <NMakeBuildCommandLine>cmake -S "$(MSBuildProjectDirectory)" -B "$(MSBuildProjectDirectory)\build-vs" -G "Visual Studio 17 2022" -A x64 &amp;&amp; cmake --build "$(MSBuildProjectDirectory)\build-vs" --config Release</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>cmake -S "$(MSBuildProjectDirectory)" -B "$(MSBuildProjectDirectory)\build-vs" -G "Visual Studio 17 2022" -A x64 &amp;&amp; cmake --build "$(MSBuildProjectDirectory)\build-vs" --config Release --clean-first</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>if exist "$(MSBuildProjectDirectory)\build-vs\CMakeCache.txt" cmake --build "$(MSBuildProjectDirectory)\build-vs" --config Release --target clean</NMakeCleanCommandLine>
+    <NMakeOutput>$(MSBuildProjectDirectory)\build-vs\Release\EnkiSample.exe</NMakeOutput>
+    <LocalDebuggerCommand>$(MSBuildProjectDirectory)\build-vs\Release\EnkiSample.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>$(MSBuildProjectDirectory)\build-vs\Release</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="CMakeLists.txt" />
+    <None Include="README.md" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

@@ -622,14 +622,12 @@ namespace lightd3d12
 	}
 	SubmitHandle RenderDevice::SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain )
 	{
-		const SubmitHandle handle = Submit( buffer );
-		Present( swapchain );
-		return handle;
+		const TextureHandle presentTexture = GetCurrentSwapchainTexture( swapchain );
+		return Submit( buffer, presentTexture );
 	}
 	void RenderDevice::Present( SwapchainHandle swapchain ) const
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
-		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
 
 		if( swapchain.Valid() == false )
 		{
@@ -643,16 +641,9 @@ namespace lightd3d12
 
 			if( presentBackBufferResource.currentState_ != D3D12_RESOURCE_STATE_PRESENT )
 			{
-				ImmediateCommands::CommandListWrapper& wrapper = graphicsQueue.immediateCommands_->Acquire();
-
-				CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-					presentBackBufferResource.resource_.Get(),
-					presentBackBufferResource.currentState_,
-					D3D12_RESOURCE_STATE_PRESENT );
-
-				wrapper.commandList_->ResourceBarrier( 1, &barrier );
-				graphicsQueue.immediateCommands_->Submit( wrapper );
-				presentBackBufferResource.currentState_ = D3D12_RESOURCE_STATE_PRESENT;
+				throw std::runtime_error(
+					"Present requires the current swapchain texture to already be in D3D12_RESOURCE_STATE_PRESENT. "
+					"Transition it before calling Present, or use SubmitAndPresent()." );
 			}
 
 			nativeSwapchain->Present();

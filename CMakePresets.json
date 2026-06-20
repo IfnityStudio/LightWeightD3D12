@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/cmake/default",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release"
+      }
+    },
+    {
+      "name": "enki-static-only",
+      "displayName": "Enki Static Only",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/cmake/enki-static-only",
+      "cacheVariables": {
+        "LIGHTD3D12_BUILD_SAMPLES": "OFF",
+        "LIGHTD3D12_BUILD_ENKI_STATIC_ONLY_EXAMPLE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-enki-static-only-debug",
+      "displayName": "Build EnkiStaticOnly Debug",
+      "configurePreset": "enki-static-only",
+      "configuration": "Debug",
+      "targets": [
+        "EnkiStaticOnly"
+      ]
+    },
+    {
+      "name": "build-enki-static-only-release",
+      "displayName": "Build EnkiStaticOnly Release",
+      "configurePreset": "enki-static-only",
+      "configuration": "Release",
+      "targets": [
+        "EnkiStaticOnly"
+      ]
+    }
+  ]
+}
