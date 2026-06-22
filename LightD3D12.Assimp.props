@@ -2,14 +2,21 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="UserMacros">
     <LightD3D12EnableAssimp Condition="'$(LightD3D12EnableAssimp)' == ''">false</LightD3D12EnableAssimp>
+    <LightD3D12AssimpVcpkgRoot Condition="'$(LightD3D12AssimpVcpkgRoot)' == '' and '$(VcpkgInstalledDir)' != '' and '$(VcpkgTriplet)' != '' and Exists('$(VcpkgInstalledDir)$(VcpkgTriplet)\include\assimp\scene.h')">$(VcpkgInstalledDir)$(VcpkgTriplet)\</LightD3D12AssimpVcpkgRoot>
+    <LightD3D12AssimpVcpkgRoot Condition="'$(LightD3D12AssimpVcpkgRoot)' == '' and '$(VcpkgInstalledDir)' != '' and Exists('$(VcpkgInstalledDir)include\assimp\scene.h')">$(VcpkgInstalledDir)</LightD3D12AssimpVcpkgRoot>
+    <LightD3D12AssimpRoot Condition="'$(LightD3D12AssimpRoot)' == '' and '$(LightD3D12AssimpVcpkgRoot)' != ''">$(LightD3D12AssimpVcpkgRoot)</LightD3D12AssimpRoot>
     <LightD3D12AssimpRoot Condition="'$(LightD3D12AssimpRoot)' == ''">$(SolutionDir)third_party\assimp</LightD3D12AssimpRoot>
     <LightD3D12AssimpIncludeDir Condition="'$(LightD3D12AssimpIncludeDir)' == ''">$(LightD3D12AssimpRoot)\include</LightD3D12AssimpIncludeDir>
+    <LightD3D12AssimpLibDir Condition="'$(LightD3D12AssimpLibDir)' == '' and '$(Configuration)' == 'Debug' and Exists('$(LightD3D12AssimpRoot)\debug\lib\assimp-vc143-mtd.lib')">$(LightD3D12AssimpRoot)\debug\lib</LightD3D12AssimpLibDir>
+    <LightD3D12AssimpLibDir Condition="'$(LightD3D12AssimpLibDir)' == '' and Exists('$(LightD3D12AssimpRoot)\lib')">$(LightD3D12AssimpRoot)\lib</LightD3D12AssimpLibDir>
     <LightD3D12AssimpLibDir Condition="'$(LightD3D12AssimpLibDir)' == ''">$(LightD3D12AssimpRoot)\lib</LightD3D12AssimpLibDir>
+    <LightD3D12AssimpBinDir Condition="'$(LightD3D12AssimpBinDir)' == '' and '$(Configuration)' == 'Debug' and Exists('$(LightD3D12AssimpRoot)\debug\bin\assimp-vc143-mtd.dll')">$(LightD3D12AssimpRoot)\debug\bin</LightD3D12AssimpBinDir>
+    <LightD3D12AssimpBinDir Condition="'$(LightD3D12AssimpBinDir)' == '' and Exists('$(LightD3D12AssimpRoot)\bin')">$(LightD3D12AssimpRoot)\bin</LightD3D12AssimpBinDir>
     <LightD3D12AssimpBinDir Condition="'$(LightD3D12AssimpBinDir)' == ''">$(LightD3D12AssimpRoot)\bin</LightD3D12AssimpBinDir>
     <LightD3D12AssimpDebugLibrary Condition="'$(LightD3D12AssimpDebugLibrary)' == ''">assimp-vc143-mtd.lib</LightD3D12AssimpDebugLibrary>
     <LightD3D12AssimpReleaseLibrary Condition="'$(LightD3D12AssimpReleaseLibrary)' == ''">assimp-vc143-mt.lib</LightD3D12AssimpReleaseLibrary>
-    <LightD3D12AssimpDebugExtraLibraries Condition="'$(LightD3D12AssimpDebugExtraLibraries)' == ''">zlibstaticd.lib</LightD3D12AssimpDebugExtraLibraries>
-    <LightD3D12AssimpReleaseExtraLibraries Condition="'$(LightD3D12AssimpReleaseExtraLibraries)' == ''">zlibstatic.lib</LightD3D12AssimpReleaseExtraLibraries>
+    <LightD3D12AssimpDebugExtraLibraries Condition="'$(LightD3D12AssimpDebugExtraLibraries)' == '' and Exists('$(LightD3D12AssimpLibDir)\zlibstaticd.lib')">zlibstaticd.lib</LightD3D12AssimpDebugExtraLibraries>
+    <LightD3D12AssimpReleaseExtraLibraries Condition="'$(LightD3D12AssimpReleaseExtraLibraries)' == '' and Exists('$(LightD3D12AssimpLibDir)\zlibstatic.lib')">zlibstatic.lib</LightD3D12AssimpReleaseExtraLibraries>
     <LightD3D12AssimpDebugRuntimeDll Condition="'$(LightD3D12AssimpDebugRuntimeDll)' == ''">assimp-vc143-mtd.dll</LightD3D12AssimpDebugRuntimeDll>
     <LightD3D12AssimpReleaseRuntimeDll Condition="'$(LightD3D12AssimpReleaseRuntimeDll)' == ''">assimp-vc143-mt.dll</LightD3D12AssimpReleaseRuntimeDll>
   </PropertyGroup>
@@ -29,5 +36,13 @@
   <Target Name="LightD3D12CopyAssimpRuntime" AfterTargets="Build" Condition="'$(LightD3D12EnableAssimp)' == 'true' and '$(ConfigurationType)' == 'Application'">
     <Copy SourceFiles="$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpDebugRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'$(Configuration)' == 'Debug' and Exists('$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpDebugRuntimeDll)')" />
     <Copy SourceFiles="$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpReleaseRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'$(Configuration)' != 'Debug' and Exists('$(LightD3D12AssimpBinDir)\$(LightD3D12AssimpReleaseRuntimeDll)')" />
+  </Target>
+
+  <Target Name="LightD3D12CheckAssimp" BeforeTargets="ClCompile" Condition="'$(LightD3D12EnableAssimp)' == 'true' and (!Exists('$(LightD3D12AssimpIncludeDir)\assimp\scene.h') or !Exists('$(LightD3D12AssimpLibDir)\$(LightD3D12AssimpDebugLibrary)')) and '$(Configuration)' == 'Debug'">
+    <Error Text="Assimp was not found. Run scripts\bootstrap-vcpkg.ps1 from the repository root, or set LightD3D12AssimpRoot/LightD3D12AssimpLibDir to a valid Assimp layout." />
+  </Target>
+
+  <Target Name="LightD3D12CheckAssimpRelease" BeforeTargets="ClCompile" Condition="'$(LightD3D12EnableAssimp)' == 'true' and (!Exists('$(LightD3D12AssimpIncludeDir)\assimp\scene.h') or !Exists('$(LightD3D12AssimpLibDir)\$(LightD3D12AssimpReleaseLibrary)')) and '$(Configuration)' != 'Debug'">
+    <Error Text="Assimp was not found. Run scripts\bootstrap-vcpkg.ps1 from the repository root, or set LightD3D12AssimpRoot/LightD3D12AssimpLibDir to a valid Assimp layout." />
   </Target>
 </Project>

@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <PropertyGroup>
-    <LightD3D12EnableAssimp>true</LightD3D12EnableAssimp>
     <VcpkgTriplet Condition="'$(VcpkgTriplet)'==''">x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)build\generated\LightD3D12.Features.props" Condition="Exists('$(MSBuildThisFileDirectory)build\generated\LightD3D12.Features.props')" />
+  <PropertyGroup>
+    <LightD3D12EnableAssimp Condition="'$(LightD3D12EnableAssimp)'==''">false</LightD3D12EnableAssimp>
+    <LightD3D12EnableAmdFsrSdk Condition="'$(LightD3D12EnableAmdFsrSdk)'==''">false</LightD3D12EnableAmdFsrSdk>
+    <LightD3D12EnableOpenUsd Condition="'$(LightD3D12EnableOpenUsd)'==''">false</LightD3D12EnableOpenUsd>
     <VcpkgEnableManifest Condition="'$(VcpkgEnableManifest)'==''">true</VcpkgEnableManifest>
+    <VcpkgXUseBuiltInApplocalDeps Condition="'$(VcpkgXUseBuiltInApplocalDeps)'==''">true</VcpkgXUseBuiltInApplocalDeps>
     <VcpkgManifestRoot Condition="'$(VcpkgManifestRoot)'==''">$(MSBuildThisFileDirectory)</VcpkgManifestRoot>
     <VcpkgRoot Condition="'$(VcpkgRoot)'=='' and Exists('$(MSBuildThisFileDirectory)third_party\vcpkg\vcpkg.exe')">$(MSBuildThisFileDirectory)third_party\vcpkg\</VcpkgRoot>
     <VcpkgRoot Condition="'$(VcpkgRoot)'=='' and '$(VCPKG_ROOT)'!=''">$(VCPKG_ROOT)</VcpkgRoot>
     <VcpkgRoot Condition="'$(VcpkgRoot)'!='' and !HasTrailingSlash('$(VcpkgRoot)')">$(VcpkgRoot)\</VcpkgRoot>
-    <VcpkgInstalledDir Condition="'$(VcpkgInstalledDir)'=='' and Exists('$(MSBuildThisFileDirectory)vcpkg_installed\$(VcpkgTriplet)\')">$(MSBuildThisFileDirectory)vcpkg_installed\$(VcpkgTriplet)\</VcpkgInstalledDir>
-    <VcpkgInstalledDir Condition="'$(VcpkgInstalledDir)'=='' and '$(VcpkgRoot)'!='' and Exists('$(VcpkgRoot)installed\$(VcpkgTriplet)\')">$(VcpkgRoot)installed\$(VcpkgTriplet)\</VcpkgInstalledDir>
+    <VcpkgInstalledDir Condition="'$(VcpkgInstalledDir)'=='' and Exists('$(MSBuildThisFileDirectory)vcpkg_installed\$(VcpkgTriplet)\')">$(MSBuildThisFileDirectory)vcpkg_installed\</VcpkgInstalledDir>
+    <VcpkgInstalledDir Condition="'$(VcpkgInstalledDir)'=='' and '$(VcpkgRoot)'!='' and Exists('$(VcpkgRoot)installed\$(VcpkgTriplet)\')">$(VcpkgRoot)installed\</VcpkgInstalledDir>
   </PropertyGroup>
 </Project>

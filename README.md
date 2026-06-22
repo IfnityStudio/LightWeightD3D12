@@ -1,26 +1,37 @@
 # LIGHTD3D12
 
-## Bootstrap dependencies
+## Generate a Visual Studio solution
 
-From a clean clone on Windows, run:
+From a clean clone on Windows, double-click:
+
+```
+GenerateSolution.bat
+```
+
+The script asks which optional features you want:
+
+- `Enable Assimp?`
+- `Enable FSR?`
+- `Enable OpenUSD?`
+
+It then generates `LightD3D12.generated.sln`, writes the matching generated vcpkg manifest under `build\generated\vcpkg`, initializes repository submodules, and installs the selected packages into `vcpkg_installed\x64-windows`.
+
+Open `LightD3D12.generated.sln` after the script finishes. Assimp is installed from vcpkg with the default dynamic `x64-windows` triplet, so samples that enable Assimp link against the vcpkg `.lib` and deploy the runtime `.dll` next to the executable.
+
+## Manual bootstrap
+
+The generator calls the bootstrap script for you, but you can still run it directly:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1
 ```
 
-That script prepares local dependencies for the Visual Studio solution:
-
-- Clones and bootstraps `vcpkg` into `third_party\vcpkg` when no `VcpkgRoot` is provided.
-- Installs the manifest packages from `vcpkg.json` into `vcpkg_installed\x64-windows`, currently `directxtk12`, `usd`, and `winpixevent`.
-- Downloads the latest official AMD FidelityFX SDK release package and stages the signed DX12 `.lib/.dll` files under `third_party\amd_fsr_sdk`.
-
-Useful options:
+Useful direct options:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1 -VcpkgRoot D:\vcpkg
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1 -VcpkgRoot ..\shared-vcpkg
 powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1 -SkipAmdFsrSdk
 powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1 -SkipInstall
+powershell -ExecutionPolicy Bypass -File scripts\bootstrap-vcpkg.ps1 -ManifestRoot build\generated\vcpkg
 ```
-
-After that, open `LightD3D12.sln` normally. `Directory.Build.props` points MSBuild at the local vcpkg manifest install, `SdkMeshPowerplant` uses `DirectXTK12`, `UsdStaticScene` uses the `usd` package from vcpkg, and `Upscaler` uses the AMD FidelityFX files staged by the script.
 

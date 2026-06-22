@@ -1,7 +1,9 @@
 param(
     [string]$VcpkgRoot = "",
     [string]$Triplet = "x64-windows",
+    [string]$ManifestRoot = "",
     [switch]$SkipInstall,
+    [switch]$SkipSubmodules,
     [switch]$SkipAmdFsrSdk
 )
 
@@ -16,12 +18,14 @@ function Test-SubPath {
         [Parameter(Mandatory = $true)][string]$Root
     )
 
-    $fullPath = [System.IO.Path]::GetFullPath($Path)
-    $fullRoot = [System.IO.Path]::GetFullPath($Root)
-    if (-not $fullRoot.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
-        $fullRoot += [System.IO.Path]::DirectorySeparatorChar
+    $separators = [char[]]@([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd($separators)
+    $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd($separators)
+    if ($fullPath.Equals($fullRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
     }
-    return $fullPath.StartsWith($fullRoot, [System.StringComparison]::OrdinalIgnoreCase)
+
+    return $fullPath.StartsWith($fullRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Copy-DirectorySafe {
@@ -126,6 +130,29 @@ function Install-AmdFsrSdk {
 if ([string]::IsNullOrWhiteSpace($VcpkgRoot)) {
     $VcpkgRoot = Join-Path $repoRoot "third_party\vcpkg"
 }
+elseif (-not [System.IO.Path]::IsPathRooted($VcpkgRoot)) {
+    $VcpkgRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $VcpkgRoot))
+}
+
+if ([string]::IsNullOrWhiteSpace($ManifestRoot)) {
+    $ManifestRoot = $repoRoot
+}
+else {
+    $ManifestRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $ManifestRoot))
+}
+
+if (-not (Test-SubPath -Path $ManifestRoot -Root $repoRoot)) {
+    throw "ManifestRoot must be inside the repository: $ManifestRoot"
+}
+
+if (-not $SkipSubmodules -and (Test-Path (Join-Path $repoRoot ".git")) -and (Test-Path (Join-Path $repoRoot ".gitmodules"))) {
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        throw "git is required to initialize repository submodules."
+    }
+
+    Write-Host "Initializing repository submodules..."
+    git -C $repoRoot submodule update --init --recursive
+}
 
 if (-not (Test-Path $VcpkgRoot)) {
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -152,10 +179,11 @@ if ($SkipInstall) {
 }
 else {
     $installRoot = Join-Path $repoRoot "vcpkg_installed"
-    & $vcpkgExe install "--triplet=$Triplet" "--x-manifest-root=$repoRoot" "--x-install-root=$installRoot"
+    & $vcpkgExe install "--triplet=$Triplet" "--x-manifest-root=$ManifestRoot" "--x-install-root=$installRoot"
 
     Write-Host ""
     Write-Host "vcpkg packages installed."
+    Write-Host "VcpkgManifestRoot=$ManifestRoot"
     Write-Host "VCPKG_ROOT=$VcpkgRoot"
     Write-Host "VcpkgInstalledDir=$installRoot\$Triplet\"
 }

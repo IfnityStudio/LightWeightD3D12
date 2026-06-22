@@ -1,5 +1,6 @@
 # Visual Studio 2022
 .vs/
+LightD3D12.generated.sln
 *.VC.db
 *.VC.opendb
 *.suo
