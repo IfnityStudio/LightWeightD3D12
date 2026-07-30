@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{74BB4952-5E18-460C-AE6A-8480A3A1E830}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{61EF9EAC-42D2-4727-96D2-B8CE58CA356A}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <None Include="README.md" />
+    <None Include="shaders\DesktopRetroOverlayPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\DesktopRetroOverlayVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\NewPixieAccumulatePS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\NewPixieBlurPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

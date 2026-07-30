@@ -431,6 +431,10 @@ namespace lightd3d12
 		ComputePipelineState CreateComputePipeline( const ComputePipelineDesc& desc );
 		BufferHandle CreateBuffer( const BufferDesc& desc );
 		TextureHandle CreateTexture( const TextureDesc& desc );
+		// Imports a texture allocated by another Direct3D 12-compatible component.
+		// The resource must stay compatible with desc for its whole lifetime. This call
+		// retains a COM reference and creates LightD3D12's views for the resource.
+		TextureHandle ImportTexture( ID3D12Resource* nativeTexture, const TextureDesc& desc );
 		void DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;

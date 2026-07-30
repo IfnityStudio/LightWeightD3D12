@@ -876,6 +876,58 @@ namespace lightd3d12
 		return handle;
 	}
 
+	TextureHandle RenderDevice::ImportTexture( ID3D12Resource* nativeTexture,
+											 const TextureDesc& desc )
+	{
+		if( nativeTexture == nullptr )
+		{
+			throw std::runtime_error( "ImportTexture requires a valid native texture resource." );
+		}
+
+		DeviceManager::Impl& impl = *manager_->impl_;
+		ValidateTextureDesc( desc );
+		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
+		if( creationPlan.generateInitialMipChain_ )
+		{
+			throw std::runtime_error( "ImportTexture does not support automatic mip generation." );
+		}
+
+		TextureResource resource = PrepareTextureResource( desc, creationPlan );
+		const D3D12_RESOURCE_DESC nativeDesc = nativeTexture->GetDesc();
+		if( nativeDesc.Dimension != resource.desc_.Dimension ||
+			nativeDesc.Width != resource.desc_.Width ||
+			nativeDesc.Height != resource.desc_.Height ||
+			nativeDesc.DepthOrArraySize != resource.desc_.DepthOrArraySize ||
+			nativeDesc.MipLevels != resource.desc_.MipLevels ||
+			nativeDesc.Format != resource.desc_.Format ||
+			nativeDesc.SampleDesc.Count != resource.desc_.SampleDesc.Count )
+		{
+			throw std::runtime_error( "The imported texture resource does not match its TextureDesc." );
+		}
+
+		resource.resource_ = nativeTexture;
+		resource.desc_ = nativeDesc;
+
+		if( HasTextureUsage( desc.usage, TextureUsage::Sampled ) )
+		{
+			CreateTextureShaderResourceView( impl, resource );
+		}
+		if( HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
+		{
+			CreateTextureUnorderedAccessView( impl, resource );
+		}
+		if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) )
+		{
+			CreateTextureRenderTargetView( impl, resource );
+		}
+		if( HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
+		{
+			CreateTextureDepthStencilView( impl, resource );
+		}
+
+		return impl.slotMapTextures_.Create( std::move( resource ) );
+	}
+
 	void RenderDevice::DownloadTexture2D( TextureHandle texture, void* outData,
 										  uint32_t rowPitch, uint32_t slicePitch )
 	{

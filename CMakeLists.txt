@@ -207,6 +207,23 @@ if(LIGHTD3D12_BUILD_SAMPLES)
     )
 
     ourAddSample(
+        LightD3D12DesktopRetroOverlay
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/main.cpp"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/DesktopRetroOverlayPS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/DesktopRetroOverlayVS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/NewPixieAccumulatePS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/NewPixieBlurPS.hlsl"
+    )
+    set_source_files_properties(
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/DesktopRetroOverlayPS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/DesktopRetroOverlayVS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/NewPixieAccumulatePS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/NewPixieBlurPS.hlsl"
+        PROPERTIES HEADER_FILE_ONLY TRUE
+    )
+    target_link_libraries(LightD3D12DesktopRetroOverlay PRIVATE d3d11 shell32 windowsapp)
+
+    ourAddSample(
         LightD3D12RayMarchingGuide
         "${ourLightD3D12Root}/samples/RayMarchingGuide/main.cpp"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/README.md"
@@ -262,6 +279,12 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/TexturePlane/main.cpp"
         "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlanePS.hlsl"
         "${ourLightD3D12Root}/samples/TexturePlane/shaders/TexturePlaneVS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/main.cpp"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/README.md"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/DesktopRetroOverlayPS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/DesktopRetroOverlayVS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/NewPixieAccumulatePS.hlsl"
+        "${ourLightD3D12Root}/samples/DesktopRetroOverlay/shaders/NewPixieBlurPS.hlsl"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/main.cpp"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/README.md"
         "${ourLightD3D12Root}/samples/RayMarchingGuide/shaders/RayMarchingGuidePS.hlsl"

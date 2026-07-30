@@ -40,6 +40,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GlobeMap", "samples\GlobeMa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TexturePlane", "samples\TexturePlane\TexturePlane.vcxproj", "{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DesktopRetroOverlay", "samples\DesktopRetroOverlay\DesktopRetroOverlay.vcxproj", "{B948DD62-2D8C-4A1F-B318-2FC2F0F11836}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnkiSample", "samples\EnkiSample\EnkiSample.vcxproj", "{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RayMarchingGuide", "samples\RayMarchingGuide\RayMarchingGuide.vcxproj", "{36CAB969-E220-42B5-8039-5D7FF289438B}"
@@ -161,6 +163,10 @@ Global
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Debug|x64.Build.0 = Debug|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.ActiveCfg = Release|x64
 		{A5B33791-FDAF-4489-BCBF-F9E43F2838F2}.Release|x64.Build.0 = Release|x64
+		{B948DD62-2D8C-4A1F-B318-2FC2F0F11836}.Debug|x64.ActiveCfg = Debug|x64
+		{B948DD62-2D8C-4A1F-B318-2FC2F0F11836}.Debug|x64.Build.0 = Debug|x64
+		{B948DD62-2D8C-4A1F-B318-2FC2F0F11836}.Release|x64.ActiveCfg = Release|x64
+		{B948DD62-2D8C-4A1F-B318-2FC2F0F11836}.Release|x64.Build.0 = Release|x64
 		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Debug|x64.ActiveCfg = Debug|x64
 		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Debug|x64.Build.0 = Debug|x64
 		{2A45C8C7-4AFB-4D48-9140-39D6F7A9C5B1}.Release|x64.ActiveCfg = Release|x64
