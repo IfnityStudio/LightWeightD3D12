@@ -191,6 +191,17 @@ if(LIGHTD3D12_BUILD_SAMPLES)
     )
 
     ourAddSample(
+        LightD3D12SrvCbvCubes
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/main.cpp"
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/README.md"
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/shaders/SrvCbvCubes.hlsl"
+    )
+    set_source_files_properties(
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/shaders/SrvCbvCubes.hlsl"
+        PROPERTIES HEADER_FILE_ONLY TRUE
+    )
+
+    ourAddSample(
         LightD3D12GlobeMap
         "${ourLightD3D12Root}/samples/GlobeMap/main.cpp"
         "${ourLightD3D12Root}/samples/GlobeMap/map.png"
@@ -271,6 +282,9 @@ if(LIGHTD3D12_BUILD_SAMPLES)
         "${ourLightD3D12Root}/samples/Sprites/main.cpp"
         "${ourLightD3D12Root}/samples/Sprites/enemy.png"
         "${ourLightD3D12Root}/samples/Cube/main.cpp"
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/main.cpp"
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/README.md"
+        "${ourLightD3D12Root}/samples/SrvCbvCubes/shaders/SrvCbvCubes.hlsl"
         "${ourLightD3D12Root}/samples/GlobeMap/main.cpp"
         "${ourLightD3D12Root}/samples/GlobeMap/map.png"
         "${ourLightD3D12Root}/samples/GlobeMap/shaders/GlobeMapGeoVS.hlsl"
