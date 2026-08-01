@@ -83,6 +83,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_libraries", "samples\t
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ejemplo2", "samples\ejemplo2\ejemplo2.vcxproj", "{83801E5E-D784-4211-8833-3A902BE379D9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_lightd3d12", "tests\test_lightd3d12\test_lightd3d12.vcxproj", "{B42D5D97-A18E-4EE2-A0FE-92D66BA341DA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -213,6 +215,10 @@ Global
 		{83801E5E-D784-4211-8833-3A902BE379D9}.Debug|x64.Build.0 = Debug|x64
 		{83801E5E-D784-4211-8833-3A902BE379D9}.Release|x64.ActiveCfg = Release|x64
 		{83801E5E-D784-4211-8833-3A902BE379D9}.Release|x64.Build.0 = Release|x64
+		{B42D5D97-A18E-4EE2-A0FE-92D66BA341DA}.Debug|x64.ActiveCfg = Debug|x64
+		{B42D5D97-A18E-4EE2-A0FE-92D66BA341DA}.Debug|x64.Build.0 = Debug|x64
+		{B42D5D97-A18E-4EE2-A0FE-92D66BA341DA}.Release|x64.ActiveCfg = Release|x64
+		{B42D5D97-A18E-4EE2-A0FE-92D66BA341DA}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

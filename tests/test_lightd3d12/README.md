@@ -23,6 +23,6 @@ Tambien puedes listar o filtrar por categoria:
 
 Categorias iniciales:
 
-- `Core.*`: handles, slot map, descriptores, flags, ventanas y carga HLSL.
+- `Core.*`: handles, slot map, descriptores, binding slots, flags, ventanas y carga HLSL.
 - `Import.*`: disponibilidad y consultas de importacion Assimp.
-- `Hardware.*`: device manager, recursos, validacion, pipelines y command buffers reales.
+- `Hardware.*`: device manager, binding slots, recursos, validacion, pipelines y command buffers reales.

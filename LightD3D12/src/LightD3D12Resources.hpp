@@ -32,7 +32,9 @@ namespace lightd3d12
 		D3D12_RESOURCE_DESC desc_ = {};
 		D3D12_HEAP_TYPE heapType_ = D3D12_HEAP_TYPE_DEFAULT;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle_{ 0 };
 		uint32_t srvIndex_ = UINT32_MAX;
+		uint32_t cbvIndex_ = UINT32_MAX;
 		void* mappedPtr_ = nullptr;
 	};
 

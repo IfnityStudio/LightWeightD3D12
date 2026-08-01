@@ -318,6 +318,7 @@ namespace
 				TEST_REQUIRE_EQ( bufferDesc.size, 0ull );
 				TEST_REQUIRE_EQ( bufferDesc.stride, 0u );
 				TEST_REQUIRE_EQ( static_cast<int>( bufferDesc.bufferType ), static_cast<int>( BufferDesc::BufferType::Generic ) );
+				TEST_REQUIRE( !bufferDesc.createConstantBufferView );
 
 				TextureDesc textureDesc{};
 				TEST_REQUIRE_EQ( textureDesc.width, 1u );
@@ -330,6 +331,56 @@ namespace
 				TEST_REQUIRE_EQ( static_cast<int>( pipelineDesc.primitiveType ), static_cast<int>( D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE ) );
 				TEST_REQUIRE_EQ( static_cast<int>( pipelineDesc.topology ), static_cast<int>( D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST ) );
 				TEST_REQUIRE_EQ( static_cast<int>( pipelineDesc.depthFormat ), static_cast<int>( DXGI_FORMAT_UNKNOWN ) );
+			}
+		} );
+
+		tests.push_back( TestCase
+		{
+			"Core.BindingSlots",
+			"LightD3D12DefinesReserveFreeAndEngineBindingSlotRanges",
+			false,
+			[]
+			{
+				static_assert( LIGHTD3D12_DESCRIPTOR_SLOT_INVALID == 0u );
+				static_assert( BindingSlot<ConstantBufferSlot> );
+				static_assert( BindingSlot<ShaderResourceSlot> );
+				static_assert( BindingSlot<ReadWriteResourceSlot> );
+
+				static_assert( LIGHTD3D12_FREE_CBV_SLOT_FIRST == 1u );
+				static_assert( LIGHTD3D12_FREE_CBV_SLOT_COUNT == 5u );
+				static_assert( LIGHTD3D12_ENGINE_CBV_SLOT_FIRST == 6u );
+				static_assert( LIGHTD3D12_ENGINE_CBV_SLOT_COUNT == 5u );
+				static_assert( LIGHTD3D12_CBV_SLOT_LAST == 10u );
+				static_assert( ToSlotIndex( ConstantBufferSlot::FreeCB0 ) == 1u );
+				static_assert( ToSlotIndex( ConstantBufferSlot::FreeCB4 ) == 5u );
+				static_assert( ToSlotIndex( ConstantBufferSlot::EngineFrame ) == 6u );
+				static_assert( ToSlotIndex( ConstantBufferSlot::EngineLighting ) == 10u );
+				static_assert( IsFreeConstantBufferSlot( ConstantBufferSlot::FreeCB2 ) );
+				static_assert( IsEngineConstantBufferSlot( ConstantBufferSlot::EngineCamera ) );
+				static_assert( !IsValidConstantBufferSlot( ConstantBufferSlot::Invalid ) );
+
+				static_assert( LIGHTD3D12_FREE_SRV_SLOT_FIRST == 11u );
+				static_assert( LIGHTD3D12_FREE_SRV_SLOT_COUNT == 5u );
+				static_assert( LIGHTD3D12_ENGINE_SRV_SLOT_FIRST == 16u );
+				static_assert( LIGHTD3D12_ENGINE_SRV_SLOT_COUNT == 5u );
+				static_assert( LIGHTD3D12_SRV_SLOT_LAST == 20u );
+				static_assert( ToSlotIndex( ShaderResourceSlot::FreeSRV4 ) == 15u );
+				static_assert( ToSlotIndex( ShaderResourceSlot::EngineTextures ) == 20u );
+				static_assert( IsFreeShaderResourceSlot( ShaderResourceSlot::FreeSRV1 ) );
+				static_assert( IsEngineShaderResourceSlot( ShaderResourceSlot::EngineMeshes ) );
+				static_assert( !IsValidShaderResourceSlot( ShaderResourceSlot::Invalid ) );
+
+				static_assert( LIGHTD3D12_FREE_RW_SLOT_FIRST == 21u );
+				static_assert( LIGHTD3D12_FREE_RW_SLOT_COUNT == 3u );
+				static_assert( LIGHTD3D12_ENGINE_RW_SLOT_FIRST == 24u );
+				static_assert( LIGHTD3D12_ENGINE_RW_SLOT_COUNT == 2u );
+				static_assert( LIGHTD3D12_RW_SLOT_LAST == 25u );
+				static_assert( ToSlotIndex( ReadWriteResourceSlot::FreeRW2 ) == 23u );
+				static_assert( ToSlotIndex( ReadWriteResourceSlot::EngineScratch1 ) == 25u );
+				static_assert( IsFreeReadWriteResourceSlot( ReadWriteResourceSlot::FreeRW0 ) );
+				static_assert( IsEngineReadWriteResourceSlot( ReadWriteResourceSlot::EngineScratch0 ) );
+				static_assert( !IsValidReadWriteResourceSlot( ReadWriteResourceSlot::Invalid ) );
+				static_assert( LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST == 26u );
 			}
 		} );
 
@@ -428,6 +479,8 @@ namespace
 				TEST_REQUIRE( std::string_view( stage.source ).find( "float4(1, 0, 0, 1)" ) != std::string_view::npos );
 				TEST_REQUIRE_EQ( std::string_view( stage.entryPoint ), std::string_view( "Shade" ) );
 				TEST_REQUIRE_EQ( std::string_view( stage.profile ), std::string_view( "ps_5_0" ) );
+				TEST_REQUIRE_EQ( std::filesystem::path( stage.sourceName ).lexically_normal(), expectedPath );
+				TEST_REQUIRE( stage.includeDirectories.size() >= 2u );
 			}
 		} );
 
@@ -472,8 +525,50 @@ namespace
 
 		tests.push_back( TestCase
 		{
+			"Hardware.BindingSlots",
+			"AllocatesFreeBindingSlotsInOrderAndRejectsExhaustion",
+			true,
+			[]
+			{
+				ScopedDeviceManager device;
+				RenderDevice& ctx = device.RenderDeviceRef();
+
+				for( uint32_t expected = LIGHTD3D12_FREE_CBV_SLOT_FIRST;
+					 expected < LIGHTD3D12_FREE_CBV_SLOT_FIRST + LIGHTD3D12_FREE_CBV_SLOT_COUNT;
+					 ++expected )
+				{
+					const ConstantBufferSlot slot = ctx.GetAvailableConstantBuffer();
+					TEST_REQUIRE_EQ( ToSlotIndex( slot ), expected );
+					TEST_REQUIRE( IsFreeConstantBufferSlot( slot ) );
+				}
+				TEST_REQUIRE_THROWS( ctx.GetAvailableConstantBuffer() );
+
+				for( uint32_t expected = LIGHTD3D12_FREE_SRV_SLOT_FIRST;
+					 expected < LIGHTD3D12_FREE_SRV_SLOT_FIRST + LIGHTD3D12_FREE_SRV_SLOT_COUNT;
+					 ++expected )
+				{
+					const ShaderResourceSlot slot = ctx.GetAvailableShaderResource();
+					TEST_REQUIRE_EQ( ToSlotIndex( slot ), expected );
+					TEST_REQUIRE( IsFreeShaderResourceSlot( slot ) );
+				}
+				TEST_REQUIRE_THROWS( ctx.GetAvailableShaderResource() );
+
+				for( uint32_t expected = LIGHTD3D12_FREE_RW_SLOT_FIRST;
+					 expected < LIGHTD3D12_FREE_RW_SLOT_FIRST + LIGHTD3D12_FREE_RW_SLOT_COUNT;
+					 ++expected )
+				{
+					const ReadWriteResourceSlot slot = ctx.GetAvailableReadWriteResource();
+					TEST_REQUIRE_EQ( ToSlotIndex( slot ), expected );
+					TEST_REQUIRE( IsFreeReadWriteResourceSlot( slot ) );
+				}
+				TEST_REQUIRE_THROWS( ctx.GetAvailableReadWriteResource() );
+			}
+		} );
+
+		tests.push_back( TestCase
+		{
 			"Hardware.Resources",
-			"CreatesAndDestroysBasicBufferAndSampledTexture",
+			"CreatesAndDestroysBasicBuffersAndSampledTexture",
 			true,
 			[]
 			{
@@ -490,7 +585,66 @@ namespace
 				bufferDesc.dataSize = sizeof( initialData );
 				BufferHandle buffer = ctx.CreateBuffer( bufferDesc );
 				TEST_REQUIRE( buffer.Valid() );
+				TEST_REQUIRE_EQ( ctx.GetBindlessIndex( buffer ), LIGHTD3D12_DESCRIPTOR_SLOT_INVALID );
+				TEST_REQUIRE_EQ( ctx.GetConstantBufferIndex( buffer ), LIGHTD3D12_DESCRIPTOR_SLOT_INVALID );
 				ctx.Destroy( buffer );
+
+				BufferDesc dynamicSrvBufferDesc{};
+				dynamicSrvBufferDesc.debugName = "test_lightd3d12 dynamic srv buffer";
+				dynamicSrvBufferDesc.size = sizeof( initialData );
+				dynamicSrvBufferDesc.stride = sizeof( uint32_t );
+				dynamicSrvBufferDesc.createShaderResourceView = true;
+				dynamicSrvBufferDesc.data = initialData.data();
+				dynamicSrvBufferDesc.dataSize = sizeof( initialData );
+				BufferHandle dynamicSrvBuffer = ctx.CreateBuffer( dynamicSrvBufferDesc );
+				TEST_REQUIRE( dynamicSrvBuffer.Valid() );
+				TEST_REQUIRE( ctx.GetBindlessIndex( dynamicSrvBuffer ) >= LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST );
+				TEST_REQUIRE_EQ( ctx.GetConstantBufferIndex( dynamicSrvBuffer ), LIGHTD3D12_DESCRIPTOR_SLOT_INVALID );
+				ctx.Destroy( dynamicSrvBuffer );
+
+				BufferDesc fixedSrvBufferDesc{};
+				fixedSrvBufferDesc.debugName = "test_lightd3d12 fixed slot srv buffer";
+				fixedSrvBufferDesc.size = sizeof( initialData );
+				fixedSrvBufferDesc.stride = sizeof( uint32_t );
+				fixedSrvBufferDesc.data = initialData.data();
+				fixedSrvBufferDesc.dataSize = sizeof( initialData );
+				BufferHandle fixedSrvBuffer = ctx.CreateBuffer( fixedSrvBufferDesc, ShaderResourceSlot::FreeSRV0 );
+				TEST_REQUIRE( fixedSrvBuffer.Valid() );
+				TEST_REQUIRE_EQ( ctx.GetBindlessIndex( fixedSrvBuffer ), ToSlotIndex( ShaderResourceSlot::FreeSRV0 ) );
+				std::array<uint32_t, 4> updatedData = { 4u, 3u, 2u, 1u };
+				ctx.WriteBuffer( fixedSrvBuffer, 0, updatedData.data(), sizeof( updatedData ) );
+				ctx.Destroy( fixedSrvBuffer );
+
+				struct TestConstants
+				{
+					std::array<float, 4> color = { 0.25f, 0.5f, 1.0f, 1.0f };
+				};
+
+				TestConstants constants{};
+				BufferDesc constantBufferDesc{};
+				constantBufferDesc.debugName = "test_lightd3d12 constant buffer view";
+				constantBufferDesc.size = sizeof( constants );
+				constantBufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+				constantBufferDesc.data = &constants;
+				constantBufferDesc.dataSize = sizeof( constants );
+				BufferHandle constantBuffer = ctx.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );
+				TEST_REQUIRE( constantBuffer.Valid() );
+				TEST_REQUIRE_EQ( ctx.GetConstantBufferIndex( constantBuffer ), ToSlotIndex( ConstantBufferSlot::FreeCB0 ) );
+				TEST_REQUIRE_EQ( ctx.GetBindlessIndex( constantBuffer ), LIGHTD3D12_DESCRIPTOR_SLOT_INVALID );
+				ctx.Destroy( constantBuffer );
+
+				BufferDesc dynamicConstantBufferDesc{};
+				dynamicConstantBufferDesc.debugName = "test_lightd3d12 dynamic constant buffer view";
+				dynamicConstantBufferDesc.size = sizeof( constants );
+				dynamicConstantBufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+				dynamicConstantBufferDesc.createConstantBufferView = true;
+				dynamicConstantBufferDesc.data = &constants;
+				dynamicConstantBufferDesc.dataSize = sizeof( constants );
+				BufferHandle dynamicConstantBuffer = ctx.CreateBuffer( dynamicConstantBufferDesc );
+				TEST_REQUIRE( dynamicConstantBuffer.Valid() );
+				TEST_REQUIRE( ctx.GetConstantBufferIndex( dynamicConstantBuffer ) >= LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST );
+				TEST_REQUIRE_EQ( ctx.GetBindlessIndex( dynamicConstantBuffer ), LIGHTD3D12_DESCRIPTOR_SLOT_INVALID );
+				ctx.Destroy( dynamicConstantBuffer );
 
 				TextureDesc textureDesc{};
 				textureDesc.debugName = "test_lightd3d12 sampled texture";
@@ -500,7 +654,7 @@ namespace
 				textureDesc.usage = TextureUsage::Sampled;
 				TextureHandle texture = ctx.CreateTexture( textureDesc );
 				TEST_REQUIRE( texture.Valid() );
-				TEST_REQUIRE( ctx.GetBindlessIndex( texture ) != UINT32_MAX );
+				TEST_REQUIRE( ctx.GetBindlessIndex( texture ) >= LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST );
 				ctx.Destroy( texture );
 			}
 		} );
@@ -570,6 +724,67 @@ float4 main() : SV_Target0
 
 				RenderPipelineState pipeline = ctx.CreateRenderPipeline( desc );
 				TEST_REQUIRE( pipeline.Valid() );
+
+				const std::filesystem::path previousRoot = LightHLSLLoader::GetRootDirectory();
+				const std::filesystem::path tempRoot = std::filesystem::temp_directory_path() / "test_lightd3d12_hlsl_include_pipeline";
+
+				struct ScopedIncludePipelineShaderState final
+				{
+					std::filesystem::path previousRoot;
+					std::filesystem::path tempRoot;
+
+					~ScopedIncludePipelineShaderState()
+					{
+						LightHLSLLoader::ClearCache();
+						LightHLSLLoader::SetRootDirectory( previousRoot );
+
+						std::error_code ignored;
+						std::filesystem::remove_all( tempRoot, ignored );
+					}
+				} shaderStateGuard{ previousRoot, tempRoot };
+
+				std::error_code ignored;
+				std::filesystem::remove_all( tempRoot, ignored );
+				std::filesystem::create_directories( tempRoot );
+
+				const std::filesystem::path includeShaderPath = tempRoot / "fixed_slot_include.hlsl";
+				{
+					std::ofstream shaderFile( includeShaderPath, std::ios::binary );
+					shaderFile << R"(
+#include "LightD3D12_Defines.hlsli"
+
+float4 VSMain(uint vertexID : SV_VertexID) : SV_Position
+{
+    const float2 positions[3] =
+    {
+        float2(-1.0, -1.0),
+        float2(-1.0,  3.0),
+        float2( 3.0, -1.0)
+    };
+    return float4(positions[vertexID], 0.0, 1.0);
+}
+
+float4 PSMain() : SV_Target0
+{
+    const float tint = LIGHTD3D12_SRV_SLOT_FREESRV0 > LIGHTD3D12_CBV_SLOT_FREECB0 ? 0.75 : 0.25;
+    return float4(tint, 0.35, 0.9, 1.0);
+}
+)";
+				}
+
+				LightHLSLLoader::ClearCache();
+				LightHLSLLoader::SetRootDirectory( tempRoot );
+
+				RenderPipelineDesc includeDesc{};
+				includeDesc.vertexShader = LightHLSLLoader::LoadStage( "fixed_slot_include.hlsl", "vs_6_6", "VSMain" );
+				includeDesc.fragmentShader = LightHLSLLoader::LoadStage( "fixed_slot_include.hlsl", "ps_6_6", "PSMain" );
+				includeDesc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
+				includeDesc.depthFormat = DXGI_FORMAT_UNKNOWN;
+				includeDesc.depthStencilState.DepthEnable = FALSE;
+				includeDesc.depthStencilState.StencilEnable = FALSE;
+
+				RenderPipelineState includePipeline = ctx.CreateRenderPipeline( includeDesc );
+				TEST_REQUIRE( includePipeline.Valid() );
 			}
 		} );
 

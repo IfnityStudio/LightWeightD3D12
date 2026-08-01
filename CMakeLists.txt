@@ -39,6 +39,7 @@ find_package(directxtk12 CONFIG QUIET)
 
 set(ourPublicHeaders
     "${ourLibraryRoot}/include/LightD3D12/HandleSlotMap.hpp"
+    "${ourLibraryRoot}/include/LightD3D12/LightD3D12_Defines.hpp"
     "${ourLibraryRoot}/include/LightD3D12/LightD3D12.hpp"
     "${ourLibraryRoot}/include/LightD3D12/LightD3D12Imgui.hpp"
     "${ourLibraryRoot}/include/LightD3D12/LightHLSLLoader.hpp"
@@ -57,6 +58,7 @@ set(ourPrivateHeaders
 )
 
 set(ourLibraryShaderFiles
+    "${ourLibraryRoot}/src/shaders/LightD3D12_Defines.hlsli"
     "${ourLibraryRoot}/src/shaders/LightD3D12BaseMipsCS.hlsl"
 )
 

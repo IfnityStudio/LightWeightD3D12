@@ -27,11 +27,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup Label="Repository">
+    <RepositoryRoot>$(MSBuildThisFileDirectory)..\</RepositoryRoot>
+  </PropertyGroup>
   <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -40,13 +43,13 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <Import Project="$(SolutionDir)LightD3D12.PIX.props" Condition="exists('$(SolutionDir)LightD3D12.PIX.props')" />
-  <Import Project="$(SolutionDir)LightD3D12.FSR.props" Condition="exists('$(SolutionDir)LightD3D12.FSR.props')" />
-  <Import Project="$(SolutionDir)LightD3D12.Assimp.props" Condition="exists('$(SolutionDir)LightD3D12.Assimp.props')" />
+  <Import Project="$(RepositoryRoot)LightD3D12.PIX.props" Condition="exists('$(RepositoryRoot)LightD3D12.PIX.props')" />
+  <Import Project="$(RepositoryRoot)LightD3D12.FSR.props" Condition="exists('$(RepositoryRoot)LightD3D12.FSR.props')" />
+  <Import Project="$(RepositoryRoot)LightD3D12.Assimp.props" Condition="exists('$(RepositoryRoot)LightD3D12.Assimp.props')" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <OutDir>$(RepositoryRoot)build\$(Configuration)\</OutDir>
+    <IntDir>$(RepositoryRoot)build\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <TargetName>LightD3D12</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -56,7 +59,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)D3D12;$(SolutionDir)third_party\imgui;$(SolutionDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(RepositoryRoot)D3D12;$(RepositoryRoot)third_party\imgui;$(RepositoryRoot)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -70,7 +73,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(SolutionDir)D3D12;$(SolutionDir)third_party\imgui;$(SolutionDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(RepositoryRoot)D3D12;$(RepositoryRoot)third_party\imgui;$(RepositoryRoot)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -79,6 +82,7 @@
     <ClInclude Include="include\LightD3D12\HandleSlotMap.hpp" />
     <ClInclude Include="include\LightD3D12\LightAssimpImporter.hpp" />
     <ClInclude Include="include\LightD3D12\LightD3D12.hpp" />
+    <ClInclude Include="include\LightD3D12\LightD3D12_Defines.hpp" />
     <ClInclude Include="include\LightD3D12\LightHLSLLoader.hpp" />
     <ClInclude Include="include\LightD3D12\LightD3D12Imgui.hpp" />
     <ClInclude Include="src\LightD3D12Internal.hpp" />
@@ -113,6 +117,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ClassDiagram.cd" />
+    <None Include="src\shaders\LightD3D12_Defines.hlsli" />
     <None Include="src\shaders\LightD3D12BaseMipsCS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

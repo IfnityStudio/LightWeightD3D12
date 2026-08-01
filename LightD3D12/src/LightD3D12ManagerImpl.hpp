@@ -77,6 +77,7 @@ namespace lightd3d12
 
 		uint32_t AllocateBindlessDescriptor();
 		uint32_t AllocateBindlessDescriptorRange( uint32_t count );
+		uint32_t AllocateFixedBindlessDescriptor( uint32_t index );
 		uint32_t AllocateRtvDescriptor();
 		uint32_t AllocateDsvDescriptor();
 		void FreeBindlessDescriptor( uint32_t index );
@@ -119,7 +120,14 @@ namespace lightd3d12
 			uint32_t start_ = 0;
 			uint32_t count_ = 0;
 		};
+		struct BindingSlotMasks final
+		{
+			uint32_t constantBuffer_ = 0;
+			uint32_t shaderResource_ = 0;
+			uint32_t readWriteResource_ = 0;
+		};
 		std::vector<DescriptorRange> freeBindlessRanges_;
+		std::vector<uint8_t> fixedBindlessDescriptorUsed_;
 		std::vector<uint32_t> freeRtvDescriptors_;
 		std::vector<uint32_t> freeDsvDescriptors_;
 		ComPtr<ID3D12RootSignature> rootSignature_;
@@ -129,6 +137,7 @@ namespace lightd3d12
 		SlotMap<TextureResource> slotMapTextures_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
 		std::unique_ptr<BaseMips> baseMips_;
+		BindingSlotMasks allocatedFreeBindingSlots_;
 		bool bindlessSupported_ = false;
 	};
 }

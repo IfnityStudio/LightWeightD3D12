@@ -8,6 +8,7 @@
 #include <fstream>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace lightd3d12
@@ -364,20 +365,42 @@ namespace lightd3d12
 			( sanitizedEntryPoint + L"_" + sanitizedProfile + L"_" + std::to_wstring( shaderHash ) + L".pdb" );
 		const std::wstring pdbPathWide = pdbPath.wstring();
 
-		std::array<LPCWSTR, 12> arguments = {
-			L"-E",
-			entryPoint.c_str(),
-			L"-T",
-			targetProfile.c_str(),
-			L"-HV",
-			L"2021",
-			DXC_ARG_WARNINGS_ARE_ERRORS,
-			DXC_ARG_PACK_MATRIX_ROW_MAJOR,
-			L"-Zi",
-			L"-Fd",
-			pdbPathWide.c_str(),
-			DXC_ARG_DEBUG,
+		std::vector<std::wstring> ownedArguments;
+		ownedArguments.reserve( stage.includeDirectories.size() + 1u );
+		std::vector<LPCWSTR> arguments;
+		arguments.reserve( 12u + stage.includeDirectories.size() * 2u );
+		const auto pushArgument = [ &arguments ]( LPCWSTR argument )
+		{
+			arguments.push_back( argument );
 		};
+		const auto pushOwnedArgument = [ &ownedArguments, &arguments ]( std::wstring argument )
+		{
+			ownedArguments.push_back( std::move( argument ) );
+			arguments.push_back( ownedArguments.back().c_str() );
+		};
+
+		pushArgument( L"-E" );
+		pushArgument( entryPoint.c_str() );
+		pushArgument( L"-T" );
+		pushArgument( targetProfile.c_str() );
+		pushArgument( L"-HV" );
+		pushArgument( L"2021" );
+		pushArgument( DXC_ARG_WARNINGS_ARE_ERRORS );
+		pushArgument( DXC_ARG_PACK_MATRIX_ROW_MAJOR );
+		pushArgument( L"-Zi" );
+		pushArgument( L"-Fd" );
+		pushArgument( pdbPathWide.c_str() );
+		pushArgument( DXC_ARG_DEBUG );
+		for( const std::string& includeDirectory : stage.includeDirectories )
+		{
+			if( includeDirectory.empty() )
+			{
+				continue;
+			}
+
+			pushArgument( L"-I" );
+			pushOwnedArgument( ToWide( includeDirectory.c_str() ) );
+		}
 
 		DxcBuffer sourceBuffer{};
 		sourceBuffer.Ptr = stage.source;

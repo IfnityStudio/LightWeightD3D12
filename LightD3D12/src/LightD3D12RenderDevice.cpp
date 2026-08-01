@@ -19,6 +19,36 @@ namespace lightd3d12
 			bool requiresTypedUavViews_ = false;
 		};
 
+		template<typename SlotType>
+		[[nodiscard]] SlotType AllocateFreeBindingSlot(
+			uint32_t& allocatedMask,
+			uint32_t firstSlot,
+			uint32_t slotCount,
+			const char* exhaustedMessage )
+		{
+			for( uint32_t slotOffset = 0; slotOffset < slotCount; ++slotOffset )
+			{
+				const uint32_t bit = 1u << slotOffset;
+				if( ( allocatedMask & bit ) == 0 )
+				{
+					allocatedMask |= bit;
+					return static_cast<SlotType>( firstSlot + slotOffset );
+				}
+			}
+
+			throw std::runtime_error( exhaustedMessage );
+		}
+
+		[[nodiscard]] uint64_t AlignUp( uint64_t value, uint64_t alignment ) noexcept
+		{
+			return ( value + alignment - 1u ) & ~( alignment - 1u );
+		}
+
+		[[nodiscard]] uint32_t ToPublicDescriptorIndex( uint32_t index ) noexcept
+		{
+			return index == UINT32_MAX ? LIGHTD3D12_DESCRIPTOR_SLOT_INVALID : index;
+		}
+
 		[[nodiscard]] uint16_t
 			ClampTextureMipCount( uint32_t width, uint32_t height,
 								  uint16_t requestedMipCount ) noexcept
@@ -160,10 +190,10 @@ namespace lightd3d12
 		}
 
 		D3D12_RESOURCE_FLAGS
-			ResolveTextureResourceFlags( TextureUsage usage,
-										 bool requiresTypedUavViews ) noexcept
+			ResolveTextureResourceFlags( TextureUsage usage, D3D12_RESOURCE_FLAGS additionalFlags,
+									 bool requiresTypedUavViews ) noexcept
 		{
-			D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+			D3D12_RESOURCE_FLAGS flags = additionalFlags;
 			if( HasTextureUsage( usage, TextureUsage::RenderTarget ) )
 			{
 				flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -185,6 +215,15 @@ namespace lightd3d12
 
 		void ValidateTextureDesc( const TextureDesc& desc )
 		{
+			constexpr D3D12_RESOURCE_FLAGS allowedAdditionalFlags =
+				D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
+			if( ( desc.additionalResourceFlags & ~allowedAdditionalFlags ) != 0 )
+			{
+				throw std::runtime_error(
+					"TextureDesc::additionalResourceFlags supports only "
+					"D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS." );
+			}
+
 			if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) &&
 				HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
 			{
@@ -255,7 +294,7 @@ namespace lightd3d12
 			resource.formats_ =
 				ResolveTextureFormats( desc, creationPlan.requiresTypedUavViews_ );
 			resource.usageFlags_ = ResolveTextureResourceFlags(
-				desc.usage, creationPlan.requiresTypedUavViews_ );
+				desc.usage, desc.additionalResourceFlags, creationPlan.requiresTypedUavViews_ );
 			resource.currentState_ = desc.initialState;
 			resource.isDepthFormat_ =
 				TextureResource::IsDepthFormat( resource.formats_.dsv_ );
@@ -758,19 +797,59 @@ namespace lightd3d12
 
 	BufferHandle RenderDevice::CreateBuffer( const BufferDesc& desc )
 	{
+		return CreateBufferInternal( desc, UINT32_MAX, UINT32_MAX );
+	}
+
+	BufferHandle RenderDevice::CreateBuffer( const BufferDesc& desc, ConstantBufferSlot slot )
+	{
+		if( !IsValidConstantBufferSlot( slot ) )
+		{
+			throw std::runtime_error( "Invalid constant buffer slot." );
+		}
+
+		BufferDesc fixedSlotDesc = desc;
+		fixedSlotDesc.createConstantBufferView = true;
+		return CreateBufferInternal( fixedSlotDesc, ToSlotIndex( slot ), UINT32_MAX );
+	}
+
+	BufferHandle RenderDevice::CreateBuffer( const BufferDesc& desc, ShaderResourceSlot slot )
+	{
+		if( !IsValidShaderResourceSlot( slot ) )
+		{
+			throw std::runtime_error( "Invalid shader resource slot." );
+		}
+
+		BufferDesc fixedSlotDesc = desc;
+		fixedSlotDesc.createShaderResourceView = true;
+		return CreateBufferInternal( fixedSlotDesc, UINT32_MAX, ToSlotIndex( slot ) );
+	}
+
+	BufferHandle RenderDevice::CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot )
+	{
 		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.size == 0 )
 		{
 			throw std::runtime_error( "BufferDesc.size must be greater than zero." );
 		}
 
+		constexpr uint64_t kMaxConstantBufferViewBytes = 64ull * 1024ull;
+		if( desc.createConstantBufferView && desc.size > kMaxConstantBufferViewBytes )
+		{
+			throw std::runtime_error(
+				"Constant buffer views are limited to 64 KiB. Use an SRV/StructuredBuffer for larger data." );
+		}
+
+		const uint64_t resourceSize = desc.createConstantBufferView
+			? AlignUp( desc.size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT )
+			: desc.size;
+
 		BufferResource resource;
-		resource.bufferSize_ = desc.size;
+		resource.bufferSize_ = resourceSize;
 		resource.bufferStride_ = desc.stride;
 		resource.bufferType_ = desc.bufferType;
 		resource.resourceFlags_ = desc.flags;
 		resource.heapType_ = desc.heapType;
-		resource.desc_ = BufferResource::BufferDesc( desc.size, desc.flags );
+		resource.desc_ = BufferResource::BufferDesc( resourceSize, desc.flags );
 		resource.currentState_ = desc.heapType == D3D12_HEAP_TYPE_UPLOAD
 			? D3D12_RESOURCE_STATE_GENERIC_READ
 			: desc.initialState;
@@ -791,11 +870,10 @@ namespace lightd3d12
 
 		if( desc.createShaderResourceView )
 		{
-			resource.srvIndex_ = impl.AllocateBindlessDescriptor();
-			resource.srvHandle_ =
-				impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.srvHandle_.ptr +=
-				static_cast< SIZE_T >(resource.srvIndex_) * impl.bindlessDescriptorSize_;
+			resource.srvIndex_ = shaderResourceSlot != UINT32_MAX
+				? impl.AllocateFixedBindlessDescriptor( shaderResourceSlot )
+				: impl.AllocateBindlessDescriptor();
+			resource.srvHandle_ = MakeBindlessCpuHandle( impl, resource.srvIndex_ );
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -818,6 +896,19 @@ namespace lightd3d12
 													resource.srvHandle_ );
 		}
 
+		if( desc.createConstantBufferView )
+		{
+			resource.cbvIndex_ = constantBufferSlot != UINT32_MAX
+				? impl.AllocateFixedBindlessDescriptor( constantBufferSlot )
+				: impl.AllocateBindlessDescriptor();
+			resource.cbvHandle_ = MakeBindlessCpuHandle( impl, resource.cbvIndex_ );
+
+			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
+			cbvDesc.BufferLocation = resource.gpuAddress_;
+			cbvDesc.SizeInBytes = static_cast< UINT >(resourceSize);
+			impl.device_->CreateConstantBufferView( &cbvDesc, resource.cbvHandle_ );
+		}
+
 		if( desc.data != nullptr && desc.dataSize > 0 )
 		{
 			impl.stagingDevice_->BufferSubData(
@@ -825,6 +916,28 @@ namespace lightd3d12
 		}
 
 		return impl.slotMapBuffers_.Create( std::move( resource ) );
+	}
+
+	void RenderDevice::WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size )
+	{
+		if( size == 0 )
+		{
+			return;
+		}
+		if( data == nullptr )
+		{
+			throw std::runtime_error( "WriteBuffer requires a valid data pointer." );
+		}
+
+		DeviceManager::Impl& impl = *manager_->impl_;
+		BufferResource& resource = impl.GetBufferResource( buffer );
+		if( offset > resource.bufferSize_ || size > resource.bufferSize_ - offset )
+		{
+			throw std::runtime_error( "WriteBuffer range exceeds buffer size." );
+		}
+
+		impl.stagingDevice_->BufferSubData(
+			resource, static_cast<size_t>( offset ), static_cast<size_t>( size ), data );
 	}
 
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
@@ -937,19 +1050,54 @@ namespace lightd3d12
 											slicePitch );
 	}
 
+	ConstantBufferSlot RenderDevice::GetAvailableConstantBuffer()
+	{
+		DeviceManager::Impl& impl = *manager_->impl_;
+		return AllocateFreeBindingSlot<ConstantBufferSlot>(
+			impl.allocatedFreeBindingSlots_.constantBuffer_,
+			LIGHTD3D12_FREE_CBV_SLOT_FIRST,
+			LIGHTD3D12_FREE_CBV_SLOT_COUNT,
+			"No free constant buffer slots are available." );
+	}
+
+	ShaderResourceSlot RenderDevice::GetAvailableShaderResource()
+	{
+		DeviceManager::Impl& impl = *manager_->impl_;
+		return AllocateFreeBindingSlot<ShaderResourceSlot>(
+			impl.allocatedFreeBindingSlots_.shaderResource_,
+			LIGHTD3D12_FREE_SRV_SLOT_FIRST,
+			LIGHTD3D12_FREE_SRV_SLOT_COUNT,
+			"No free shader resource slots are available." );
+	}
+
+	ReadWriteResourceSlot RenderDevice::GetAvailableReadWriteResource()
+	{
+		DeviceManager::Impl& impl = *manager_->impl_;
+		return AllocateFreeBindingSlot<ReadWriteResourceSlot>(
+			impl.allocatedFreeBindingSlots_.readWriteResource_,
+			LIGHTD3D12_FREE_RW_SLOT_FIRST,
+			LIGHTD3D12_FREE_RW_SLOT_COUNT,
+			"No free read/write resource slots are available." );
+	}
+
+	uint32_t RenderDevice::GetConstantBufferIndex( BufferHandle buffer ) const
+	{
+		return ToPublicDescriptorIndex( manager_->impl_->GetBufferResource( buffer ).cbvIndex_ );
+	}
+
 	uint32_t RenderDevice::GetBindlessIndex( BufferHandle buffer ) const
 	{
-		return manager_->impl_->GetBufferResource( buffer ).srvIndex_;
+		return ToPublicDescriptorIndex( manager_->impl_->GetBufferResource( buffer ).srvIndex_ );
 	}
 
 	uint32_t RenderDevice::GetBindlessIndex( TextureHandle texture ) const
 	{
-		return manager_->impl_->GetTextureResource( texture ).srvIndex_;
+		return ToPublicDescriptorIndex( manager_->impl_->GetTextureResource( texture ).srvIndex_ );
 	}
 
 	uint32_t RenderDevice::GetUnorderedAccessIndex( TextureHandle texture ) const
 	{
-		return manager_->impl_->GetTextureResource( texture ).uavIndex_;
+		return ToPublicDescriptorIndex( manager_->impl_->GetTextureResource( texture ).uavIndex_ );
 	}
 
 	ID3D12Device* RenderDevice::GetNativeDevice() const noexcept
@@ -993,13 +1141,15 @@ namespace lightd3d12
 		ComPtr<ID3D12Resource> nativeResource = std::move( resource->resource_ );
 		const bool wasMapped = resource->mappedPtr_ != nullptr;
 		const uint32_t srvIndex = resource->srvIndex_;
+		const uint32_t cbvIndex = resource->cbvIndex_;
 		resource->mappedPtr_ = nullptr;
 		resource->srvIndex_ = UINT32_MAX;
+		resource->cbvIndex_ = UINT32_MAX;
 		impl.slotMapBuffers_.Destroy( buffer );
 
 		std::function<void()> release = [ &impl,
 			nativeResource = std::move( nativeResource ),
-			wasMapped, srvIndex ]() mutable
+			wasMapped, srvIndex, cbvIndex ]() mutable
 			{
 				if( nativeResource != nullptr && wasMapped )
 				{
@@ -1007,6 +1157,7 @@ namespace lightd3d12
 				}
 
 				impl.FreeBindlessDescriptor( srvIndex );
+				impl.FreeBindlessDescriptor( cbvIndex );
 				nativeResource.Reset();
 			};
 

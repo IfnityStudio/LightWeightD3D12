@@ -56,6 +56,11 @@ namespace lightd3d12
 
 			return source;
 		}
+
+		std::filesystem::path GetInternalShaderIncludeDirectory()
+		{
+			return NormalizePath( std::filesystem::path( __FILE__ ).parent_path() / "shaders" );
+		}
 	}
 
 	void LightHLSLLoader::SetRootDirectory( const std::filesystem::path& rootDirectory )
@@ -96,10 +101,14 @@ namespace lightd3d12
 
 	ShaderStageSource LightHLSLLoader::LoadStage( const std::filesystem::path& shaderPath, const char* profile, const char* entryPoint )
 	{
+		const std::filesystem::path resolvedPath = ResolvePath( shaderPath );
 		ShaderStageSource stage{};
 		stage.source = LoadSource( shaderPath );
 		stage.entryPoint = entryPoint;
 		stage.profile = profile;
+		stage.sourceName = resolvedPath.string();
+		stage.includeDirectories.push_back( resolvedPath.parent_path().string() );
+		stage.includeDirectories.push_back( GetInternalShaderIncludeDirectory().string() );
 		return stage;
 	}
 

@@ -302,6 +302,7 @@ namespace lightd3d12
 		{
 			bindlessSupported_ = options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_2;
 		}
+
 	}
 
 	void DeviceManager::Impl::InitializeCommandQueues()
@@ -387,6 +388,11 @@ namespace lightd3d12
 
 	void DeviceManager::Impl::InitializeDescriptorHeaps()
 	{
+		if( desc_.bindlessCapacity <= LIGHTD3D12_BINDLESS_FIXED_SLOT_LAST )
+		{
+			throw std::runtime_error( "Bindless descriptor capacity must include LightD3D12 fixed binding slots." );
+		}
+
 		D3D12_DESCRIPTOR_HEAP_DESC bindlessDesc{};
 		bindlessDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		bindlessDesc.NumDescriptors = desc_.bindlessCapacity;
@@ -408,7 +414,13 @@ namespace lightd3d12
 		dsvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
 
 		freeBindlessRanges_.clear();
-		freeBindlessRanges_.push_back( DescriptorRange{ .start_ = 0u, .count_ = desc_.bindlessCapacity } );
+		const uint32_t dynamicDescriptorCount =
+			desc_.bindlessCapacity - LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST;
+		if( dynamicDescriptorCount > 0 )
+		{
+			freeBindlessRanges_.push_back( DescriptorRange{ .start_ = LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST, .count_ = dynamicDescriptorCount } );
+		}
+		fixedBindlessDescriptorUsed_.assign( LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST, 0u );
 
 		freeRtvDescriptors_.reserve( desc_.rtvCapacity );
 		for( uint32_t index = desc_.rtvCapacity; index > 0; --index )
@@ -521,6 +533,24 @@ namespace lightd3d12
 		throw std::runtime_error( "Bindless descriptor heap is exhausted." );
 	}
 
+	uint32_t DeviceManager::Impl::AllocateFixedBindlessDescriptor( uint32_t index )
+	{
+		if( index < LIGHTD3D12_BINDLESS_FIXED_SLOT_FIRST ||
+			index > LIGHTD3D12_BINDLESS_FIXED_SLOT_LAST ||
+			index >= fixedBindlessDescriptorUsed_.size() )
+		{
+			throw std::runtime_error( "Invalid fixed bindless descriptor slot." );
+		}
+
+		if( fixedBindlessDescriptorUsed_[ index ] != 0u )
+		{
+			throw std::runtime_error( "Fixed bindless descriptor slot is already in use." );
+		}
+
+		fixedBindlessDescriptorUsed_[ index ] = 1u;
+		return index;
+	}
+
 	uint32_t DeviceManager::Impl::AllocateRtvDescriptor()
 	{
 		if( freeRtvDescriptors_.empty() )
@@ -554,6 +584,15 @@ namespace lightd3d12
 	{
 		if( index == UINT32_MAX || count == 0 )
 		{
+			return;
+		}
+
+		if( count == 1u &&
+			index >= LIGHTD3D12_BINDLESS_FIXED_SLOT_FIRST &&
+			index <= LIGHTD3D12_BINDLESS_FIXED_SLOT_LAST &&
+			index < fixedBindlessDescriptorUsed_.size() )
+		{
+			fixedBindlessDescriptorUsed_[ index ] = 0u;
 			return;
 		}
 

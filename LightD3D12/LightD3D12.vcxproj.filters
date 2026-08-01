@@ -15,6 +15,9 @@
     <ClInclude Include="include\LightD3D12\LightD3D12.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\LightD3D12\LightD3D12_Defines.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\LightD3D12Internal.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -86,6 +89,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ClassDiagram.cd" />
+    <None Include="src\shaders\LightD3D12_Defines.hlsli">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="src\shaders\LightD3D12BaseMipsCS.hlsl">
       <Filter>Source Files</Filter>
     </None>

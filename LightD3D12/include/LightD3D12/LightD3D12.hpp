@@ -21,6 +21,7 @@
 #include <wrl/client.h>
 
 #include "LightD3D12/HandleSlotMap.hpp"
+#include "LightD3D12/LightD3D12_Defines.hpp"
 
 namespace lightd3d12
 {
@@ -192,6 +193,8 @@ namespace lightd3d12
 		const char* source = nullptr;
 		const char* entryPoint = "main";
 		const char* profile = nullptr;
+		std::string sourceName;
+		std::vector<std::string> includeDirectories;
 	};
 
 	struct RenderPipelineDesc
@@ -233,6 +236,7 @@ namespace lightd3d12
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
 		bool createShaderResourceView = false;
+		bool createConstantBufferView = false;
 		bool rawShaderResourceView = false;
 		const void* data = nullptr;
 		uint64_t dataSize = 0;
@@ -284,6 +288,11 @@ namespace lightd3d12
 		TextureDimension dimension = TextureDimension::Texture2D;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		TextureUsage usage = TextureUsage::Sampled;
+		// Optional flags for interoperating with another D3D API. Only
+		// D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS is accepted by the
+		// lightweight resource layer; normal render/depth/UAV flags continue to
+		// be inferred from usage above.
+		D3D12_RESOURCE_FLAGS additionalResourceFlags = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
 		const void* data = nullptr;
 		uint32_t rowPitch = 0;
@@ -430,12 +439,19 @@ namespace lightd3d12
 		RenderPipelineState CreateRenderPipeline( const RenderPipelineDesc& desc );
 		ComputePipelineState CreateComputePipeline( const ComputePipelineDesc& desc );
 		BufferHandle CreateBuffer( const BufferDesc& desc );
+		BufferHandle CreateBuffer( const BufferDesc& desc, ConstantBufferSlot slot );
+		BufferHandle CreateBuffer( const BufferDesc& desc, ShaderResourceSlot slot );
+		void WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size );
 		TextureHandle CreateTexture( const TextureDesc& desc );
 		// Imports a texture allocated by another Direct3D 12-compatible component.
 		// The resource must stay compatible with desc for its whole lifetime. This call
 		// retains a COM reference and creates LightD3D12's views for the resource.
 		TextureHandle ImportTexture( ID3D12Resource* nativeTexture, const TextureDesc& desc );
 		void DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
+		ConstantBufferSlot GetAvailableConstantBuffer();
+		ShaderResourceSlot GetAvailableShaderResource();
+		ReadWriteResourceSlot GetAvailableReadWriteResource();
+		uint32_t GetConstantBufferIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
@@ -451,6 +467,7 @@ namespace lightd3d12
 		friend class DeviceManager;
 
 		explicit RenderDevice( DeviceManager& manager ) noexcept;
+		BufferHandle CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot );
 
 		DeviceManager* manager_ = nullptr;
 	};
