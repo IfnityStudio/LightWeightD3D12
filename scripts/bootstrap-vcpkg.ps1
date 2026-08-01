@@ -55,10 +55,20 @@ function Install-AmdFsrSdk {
     $amdRoot = Join-Path $repoRoot "third_party\amd_fsr_sdk"
     $amdFidelityFxRoot = Join-Path $amdRoot "Kits\FidelityFX"
     $amdSignedBin = Join-Path $amdFidelityFxRoot "signedbin"
+    $apiIncludeDir = Join-Path $amdFidelityFxRoot "api\include"
+    $upscalersIncludeDir = Join-Path $amdFidelityFxRoot "upscalers\include"
     $loaderLib = Join-Path $amdSignedBin "amd_fidelityfx_loader_dx12.lib"
+    $loaderDll = Join-Path $amdSignedBin "amd_fidelityfx_loader_dx12.dll"
+    $upscalerDll = Join-Path $amdSignedBin "amd_fidelityfx_upscaler_dx12.dll"
 
-    if (Test-Path $loaderLib) {
-        Write-Host "AMD FSR SDK binaries already exist: $amdSignedBin"
+    if (
+        (Test-Path $loaderLib) -and
+        (Test-Path $loaderDll) -and
+        (Test-Path $upscalerDll) -and
+        (Test-Path (Join-Path $apiIncludeDir "ffx_api.h")) -and
+        (Test-Path (Join-Path $upscalersIncludeDir "ffx_upscale.h"))
+    ) {
+        Write-Host "AMD FSR SDK files already exist: $amdFidelityFxRoot"
         return
     }
 
@@ -99,32 +109,81 @@ function Install-AmdFsrSdk {
     Write-Host "Extracting AMD FidelityFX SDK..."
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
 
+    # SDK 2.3 prebuilt packages contain the runtime DLLs inside each sample,
+    # but no longer contain the loader import library or public headers.
+    # Prefer the FSR sample runtime directory and support older signedbin layouts.
+    $runtimeLoaderFiles = @(
+        Get-ChildItem -Path $extractDir -Filter "amd_fidelityfx_loader_dx12.dll" -Recurse
+    )
+    $runtimeLoaderFile = $runtimeLoaderFiles |
+        Where-Object { $_.FullName -match "[\\/]Samples[\\/]Upscalers[\\/]FidelityFX_FSR[\\/]" } |
+        Select-Object -First 1
+    if (-not $runtimeLoaderFile) {
+        $runtimeLoaderFile = $runtimeLoaderFiles | Select-Object -First 1
+    }
+    if (-not $runtimeLoaderFile) {
+        throw "The downloaded AMD FidelityFX SDK package did not contain amd_fidelityfx_loader_dx12.dll."
+    }
+
+    $runtimeSourceDir = Split-Path -Parent $runtimeLoaderFile.FullName
+    New-Item -ItemType Directory -Force -Path $amdSignedBin | Out-Null
+    foreach ($runtimeName in @(
+        "amd_fidelityfx_loader_dx12.dll",
+        "amd_fidelityfx_upscaler_dx12.dll",
+        "amd_fidelityfx_framegeneration_dx12.dll"
+    )) {
+        $runtimeSource = Join-Path $runtimeSourceDir $runtimeName
+        if (Test-Path $runtimeSource) {
+            Copy-Item -LiteralPath $runtimeSource -Destination (Join-Path $amdSignedBin $runtimeName) -Force
+        }
+    }
+
     $loaderLibFile = Get-ChildItem -Path $extractDir -Filter "amd_fidelityfx_loader_dx12.lib" -Recurse |
         Select-Object -First 1
-
-    if (-not $loaderLibFile) {
-        throw "The downloaded AMD FidelityFX SDK package did not contain amd_fidelityfx_loader_dx12.lib."
+    if ($loaderLibFile) {
+        Copy-Item -LiteralPath $loaderLibFile.FullName -Destination $loaderLib -Force
+    }
+    else {
+        $loaderLibUrl =
+            "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/$($release.tag_name)/Kits/FidelityFX/signedbin/amd_fidelityfx_loader_dx12.lib"
+        Write-Host "Downloading AMD FidelityFX loader import library for $($release.tag_name)..."
+        Invoke-WebRequest -Uri $loaderLibUrl -OutFile $loaderLib -Headers $headers
     }
 
-    $sourceSignedBin = Split-Path -Parent $loaderLibFile.FullName
-    $sourceFidelityFxRoot = Split-Path -Parent $sourceSignedBin
+    $sourceApiInclude = Get-ChildItem -Path $extractDir -Filter "ffx_api.h" -Recurse |
+        Select-Object -First 1 |
+        ForEach-Object { Split-Path -Parent $_.FullName }
+    $sourceUpscalersInclude = Get-ChildItem -Path $extractDir -Filter "ffx_upscale.h" -Recurse |
+        Select-Object -First 1 |
+        ForEach-Object { Split-Path -Parent $_.FullName }
 
-    Copy-DirectorySafe -Source $sourceSignedBin -Destination $amdSignedBin | Out-Null
-
-    $sourceApiInclude = Join-Path $sourceFidelityFxRoot "api\include"
-    $sourceUpscalersInclude = Join-Path $sourceFidelityFxRoot "upscalers\include"
-
-    if (-not (Copy-DirectorySafe -Source $sourceApiInclude -Destination (Join-Path $amdFidelityFxRoot "api\include"))) {
+    if (-not $sourceApiInclude -or -not (Copy-DirectorySafe -Source $sourceApiInclude -Destination $apiIncludeDir)) {
         $fallbackApiInclude = Join-Path $repoRoot "third_party\amd_fsr_sdk_repo\Kits\FidelityFX\api\include"
-        Copy-DirectorySafe -Source $fallbackApiInclude -Destination (Join-Path $amdFidelityFxRoot "api\include") | Out-Null
+        if (-not (Copy-DirectorySafe -Source $fallbackApiInclude -Destination $apiIncludeDir)) {
+            throw "AMD FidelityFX API headers were not found in either the release package or third_party\amd_fsr_sdk_repo."
+        }
     }
 
-    if (-not (Copy-DirectorySafe -Source $sourceUpscalersInclude -Destination (Join-Path $amdFidelityFxRoot "upscalers\include"))) {
+    if (-not $sourceUpscalersInclude -or -not (Copy-DirectorySafe -Source $sourceUpscalersInclude -Destination $upscalersIncludeDir)) {
         $fallbackUpscalersInclude = Join-Path $repoRoot "third_party\amd_fsr_sdk_repo\Kits\FidelityFX\upscalers\include"
-        Copy-DirectorySafe -Source $fallbackUpscalersInclude -Destination (Join-Path $amdFidelityFxRoot "upscalers\include") | Out-Null
+        if (-not (Copy-DirectorySafe -Source $fallbackUpscalersInclude -Destination $upscalersIncludeDir)) {
+            throw "AMD FidelityFX upscaler headers were not found in either the release package or third_party\amd_fsr_sdk_repo."
+        }
     }
 
-    Write-Host "AMD FSR SDK binaries installed to: $amdSignedBin"
+    foreach ($requiredPath in @(
+        $loaderLib,
+        $loaderDll,
+        $upscalerDll,
+        (Join-Path $apiIncludeDir "ffx_api.h"),
+        (Join-Path $upscalersIncludeDir "ffx_upscale.h")
+    )) {
+        if (-not (Test-Path $requiredPath)) {
+            throw "AMD FSR SDK installation is incomplete. Missing: $requiredPath"
+        }
+    }
+
+    Write-Host "AMD FSR SDK files installed to: $amdFidelityFxRoot"
 }
 
 if ([string]::IsNullOrWhiteSpace($VcpkgRoot)) {
